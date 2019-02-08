@@ -65,11 +65,7 @@
 (define TEMP_PROC 'tempproc)
 
 
-;SYMBOL TABLES ###################################################
-
-;All available keywords
-(define keywords (list '+ '- '* '/ 'equal? '= '<= '< '>= '> 'cdr
-  'car 'cons 'pair? 'list 'lambda 'let 'letrec 'quote 'if))
+;Expressions ###################################################
 
 ;Create a procedure for unary operators that takes a list of arguments
 (define (unary-op proc)
@@ -87,7 +83,7 @@
 ;Tests to see if all elements of a list are equal
 ;x -> a list
 ;Returns true if all elements in x are equal?
-(define (allEqual? x)
+(define (my-equal? x)
   ;Recursivley checks if all elements of a list y equal a given
   ;element e
   (define (rec e y)
@@ -103,10 +99,10 @@
   (rec (car x) (cdr x)))
 
 ;Rules for evaluating if expresion
-;x -> an expression starting with if
+;x -> a list of arguments
 ;ie) (if (x) #t #f)
-;Returns the result of the expression
-(define (ifexpr x)
+;Returns the result of applying if to the first 3 arguments
+(define (my-if x)
   (let ([__cond (car x)]
         [__then (cadr x)]
         [__else (caddr x)])
@@ -120,7 +116,7 @@
 ;x -> a lambda expression
 ;ie) (lambda (x) x)
 ;Returns a proceudeure that takes a list of arguments
-(define (lambdaexpr x)
+(define (my-lambda x)
   ;Replace all variables in the body with their values, not procedures.
   (define body (replaceVars (car x) (cdr x)))
   (checkBody (car x) body)  ;check for undeclared variables in body. If both replace and check were done in one call it could be return the body to __body in the let expression as that will evaluate when the lambda is created not when it is called later.
@@ -147,7 +143,7 @@
 ;x -> an expression starting with let
 ;ie) (let ([x 5]) (+ x 7))
 ;Returns the result of the last expression in the let body
-(define (letexpr x)
+(define (my-let x)
   (let ([__vars (make-hash)]
         [__defs (car x)]
         [__body (cdr x)])
@@ -170,13 +166,8 @@
 ;Rule for letrec
 ;Allows referencing uninitialized variables
 ;x -> an expression starting with letrec
-;ie) (letrec ([fact (lambda (x)
-                      ;(if (= x 0)
-                          ;(quote 1)
-                          ;(* x (fact (- x 1)))))])
-                    ;(fact 10))
 ;Returns the result of the last expression in the letrec body
-(define (lrecexpr x)
+(define (my-letrec x)
   (let ([__vars (make-hash)]
         [__defs (car x)]
         [__body (cdr x)])
@@ -196,8 +187,17 @@
       (pop)
       res)))
 
+;Rule for evaluating expressions that have anonymous lambdas
+;for their procedure. ie) '((lambda (x y) (+ x y)) 10 20)
+(define (funcexpr x)
+  (if (not (pair? (car x)))
+    (evalRec x)
+    (evalRec ((funcexpr (car x)) (cdr x)))))
+
+;BUILTINS ########################################################
+
 ;Hash table of built-in procedures to maintain on the stack
-(define keys
+(define keywords
   (hash
     'cdr (unary-op cdr)
     'car (unary-op car)
@@ -212,13 +212,13 @@
     '>= (binary-op >=)
     '> (binary-op >)
     'cons (binary-op cons)
-    'equal? allEqual?
+    'equal? my-equal?
     'quote (lambda (x) (quasiquote (unquote (car x))))
     'list (lambda (x) (map evalRec x))
-    'if ifexpr
-    'lambda lambdaexpr
-    'let letexpr
-    'letrec lrecexpr))
+    'if my-if
+    'lambda my-lambda
+    'let my-let
+    'letrec my-letrec))
 
 ;LOCAL BINDINGS ##################################################
 
@@ -283,7 +283,7 @@
 ;x -> a quoted racket program - ie) '(+ 3 (- 10 5))
 ;Returns the result of the program
 (define (startEval x)
-  (push keys)
+  (push keywords)
   (evalRec x))
 
 ;Recursive function to evaluate list programs
@@ -293,23 +293,24 @@
 ;Returns the result of the expression
 (define (evalRec x)
   (cond
-  ;If x is a symbol if it is a keyword that hasn't been redefined
-  ;just return it. Otherwise lookit up in the variable table
-  ;and return it's value. lookup throws
-  ;an error if x is not defined.
+  ;If x is a symbol look its value up on the stack. If it exists
+  ;return it. Otherwise lookup will raise an error.
   [(symbol? x)
-    (if (and (not (var? x)) (member x keywords))
-      x
-      (lookup x))]
-  ;If x is a number or string or any other type of single element
-  ;data then it will just be returned.
+    (lookup x)]
+  ;If x is not a pair then it should be a single data type. So
+  ;we just return this value.
   [(not (pair? x))
     x]
-  ;If x is a pair then it's first element should be a procedure
-  ;And if the first element is a pair then that pair should
-  ;return a procedure. So we evaluate it as such.
+  ;If x is a pair then it's first element should be a procedure.
+  ;If the first element is a pair, then that element is a function
+  ;that returns a procedure. So evaluate it as such.
   [(pair? (car x))
     (funcexpr x)]
+  ;Otherwise if first element is not a pair then it is a single
+  ;data type so look it up in the symbol table. If its value
+  ;is a procedure run it on the list of arguments. Otherwise
+  ;raise an error, because the first element of a function should
+  ;always be a procedure
   [else
     (let ([v (lookup (car x))])
       (if (procedure? v)
@@ -319,13 +320,7 @@
             "Error: expected a procedure\n  given: ~a"
             (car x)))))]))
 
-
-;IF ##############################################################
-
-
-
-
-;LAMBDA ##########################################################
+;Helpers #########################################################
 
 ;Recursivley Checks a list to make sure that no variables are
 ;referenced before they are initialized. This prevents one kind
@@ -347,7 +342,6 @@
       [(and (symbol? __head)
             (not (or
               (member __head args)
-              (member __head keywords)
               (var? __head))))
         (ref-error __head)]
       ;Makes sure to add the parameters of a lambda that is
@@ -387,16 +381,6 @@
         (lookup y)
         y)))
   (map rec x))
-
-;Rule for evaluating expressions that have anonymous lambdas
-;for their procedure. ie) '((lambda (x y) (+ x y)) 10 20)
-(define (funcexpr x)
-  (if (not (pair? (car x)))
-    (evalRec x)
-    (evalRec ((funcexpr (car x)) (cdr x)))))
-
-
-;LET/LETREC ######################################################
 
 ;Assigns a variable and its evaluated value to the stack.
 ;Raises an error if an expression returns UN_INIT so that

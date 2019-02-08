@@ -157,6 +157,12 @@
         '(2 3 4 5)
         "-- Test let rebinding keywords with data --")
 
+(test '((let ([x 4])
+              (lambda (y) (+ x y)))
+          5)
+        9
+        "-- test let expresion that returns a procedure as anonymus lambda --")
+
 ;For more good tests you should take the answers to your
 ;assignments questions and implement them in a way that they
 ;will run with your interpreter. You will just have to use letrec
