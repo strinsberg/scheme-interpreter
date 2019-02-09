@@ -68,35 +68,32 @@
 
 ;VARIABLE BINDINGS ##############################################
 
-;Stack for local variable tables
-(define local '())
+;Stack for local variable hash tables
+(define stack '())
 
-;Push a table onto the stack
-;x -> is a hash table of variables
+;Push a hash-table of variable value pairs onto the stack
+;x -> a hash table of variable names and their values
 (define (push x)
-  (set! local (cons x local)))
+  (set! stack (cons x stack)))
 
 ;Pops the top off the stack
 (define (pop)
-  (set! local (cdr local)))
+  (set! stack (cdr stack)))
 
 ;Looks for variable in the local variable list and returns the
 ;value of that variable if it is found
 ;Otherwise raises a error for an unbound identifier
 ;v -> a variable name
 (define (lookup v)
-  ;Recursive function to find a variable in the local stack
-  ;x -> is the stack
-  (define (rec x)
-    (cond
-    [(null? x)
-      (ref-error v)]
-    [(hash-has-key? (car x) v)
-      (hash-ref (car x) v)]
-    [else
-      (rec (cdr x))]))
-  ;Call the recursive function on the local variable stack
-  (rec local))
+  (letrec ([f (lambda (x)
+                (cond
+                [(null? x)
+                  (ref-error v)]
+                [(hash-has-key? (car x) v)
+                  (hash-ref (car x) v)]
+                [else
+                  (f (cdr x))]))])
+      (f stack)))
 
 ;Raises an error for variables that are referenced before they
 ;they have been declared
@@ -311,7 +308,7 @@
 ;cannot be used for assignment
 ;x -> a variable value pair
 (define (lrec-assn x)
-  (hash-set! (car local)
+  (hash-set! (car stack) ;; this might be better changed
              (car x)
              ;Save the result of the evaluated value expression
              (let ([__val (my-eval (cadr x))])
