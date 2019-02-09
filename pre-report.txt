@@ -1,0 +1,62 @@
+Pre-report for 3740 project
+
+-- How did you organize your program
+Broke it into small functions for each type of expression
+Put the eval functions first and followed them with things related to
+builtin functions and the variable stack.
+Then included sections for evaluating specific expression types,
+starting with simple and moving to more complex.
+Then followed this up with helper functions and any functionality
+that was extra to the project description.
+
+-- What key data structures did you use? and what ar they used for?
+Used hash tables to store the local bindings for each level of scope
+Stored those in a stack that I made out of a list and wrote some
+functions to push and pop the hash tables off of.
+Also used procedures to store lambda expressions so they could be
+evaluated later on their arguments and appropriately deal with
+any variables that were present at the time. This also extended to
+any other built in procedure that I passed through a function so
+that it would have the same structure as my lambda procedures. This
+enabled me to easily add any base racket functions that I wanted
+by simply passing them through a function and storing the resulting
+procedure on the top level of the stack. This process is limited to
+procedures that take a fixed number of arguments. and I only did it
+for procedures with 1,2 or 3 arguments as this covers most of the
+basic and commonly used racket procedures.
+
+-- Limitations and bugs
+Limited checking for errors -> though this is not necessary
+There are currently no limitations as far as the project
+description is concerned, however, I implemented limited error
+checking for things like undefined variables and tried to limit
+dynamic scopeing. Some programs that wouldn't run in racket would
+most likely run on my interpreter with no errors.
+
+-- Testing strategy and sample tests
+wrote simple tests for each type of supported procedure.
+Passed the racket program to be evaluated by racket and by my
+interpreter and compared the results. This allowed me to know when
+a program would not run in racket, so any error in my program would
+not be a concern if the program was not valid. It also allowed
+changing and reorganizing of the code while easily seeing if
+there was any change in the interpreters results.
+I used some more complicated programs provided by howard and some
+of my own design to test complicated and unique scenarios on my
+interpreter. I also tried to rewrite my assignment submissions with
+the syntax that would enable me to run them on my interpreter to
+test even more functions. I regret being unable to write my
+interpreter in such a way that I could run it on itself, but this
+would certainly be far more work than is necessary for this
+project (though it would be fun to do).
+
+-- Additional Code documentation
+Lambda
+
+evaluation of multiple expressions in the body of lambda,let,letrec
+
+Variable checking and replacement
+
+Built in procedures
+
+Let/Letrec

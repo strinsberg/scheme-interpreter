@@ -1,6 +1,11 @@
 #lang racket
 (provide startEval)  ;; Make startEval available when required
 
+;; NOTE all non-trivial functions and algorithms are
+;; more fully documented in the report. This is done to keep
+;; the code more consise and not to seperate parts of an algorithm
+;; with large blocks of comments.
+
 
 ;CONSTANTS ######################################################
 
@@ -153,6 +158,7 @@
 
 
 ;; LAMBDA ########################################################
+;; See report for additional documentation
 
 ;; Evaluates a lambda expression
 ;; x -> a list of arguments to a lambda expression
@@ -181,7 +187,9 @@
       (pop)
       res))
 
+
 ;; VARIABLE CHECKING ############################################
+;; See report for additional documentation
 
 ;; Checks a list of expressions for valid variables.
 ;; vars -> list of valid variables that are not on the stack yet.
@@ -229,7 +237,9 @@
             x))
         x))
 
+
 ;LET/LETREC #####################################################
+;; See report for additional documentation
 
 ;; Evaluates a let expression
 ;; x -> a list of the arguments to a let expression
@@ -271,6 +281,7 @@
                (if (equal? UN_INIT __val)
                  (ref-error __val)
                  __val))))
+
 
 ;; HELPERS ######################################################
 
