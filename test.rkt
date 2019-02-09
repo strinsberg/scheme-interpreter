@@ -101,6 +101,10 @@
        "-- Test let with 2 levels --")
 
 ;Test lambda
+(test '((lambda (x) x) 10)
+       10
+       "-- Test lambda with just return x --")
+
 (test '((lambda (x y)
           (+ x y))
         10 20)

@@ -1,5 +1,5 @@
 #lang racket
-(provide startEval) ;Make startEval visible when required
+(provide startEval)
 
 ;NOTE since we are expecting a valid racket program a large
 ;number of expressions that only take a certain number of
@@ -8,187 +8,26 @@
 ;ie) arithmetic operations are binary so (+ 4 5 6)
 ;    will return just 4 + 5 (full racket would add them all)
 
-;NOTE in many of the rule expressions a let is used to save
-;different parts of the given expression. This is not strictly
-;necessary and adds overhead, but it makes the code a lot easier
-;to read and know what each (car x) (caddr x) (cddr x) etc.
-;is actually supposed to be.
+;NOTE I have implemented checks to make sure that variables are
+;not referenced before they are assigned to. This is not
+;strictly necessary since we expect a valid racket program,
+;but it felt like a good thing for an interpreter to do. I also
+;replace any variables that have already got values. These things
+;prevent dynamic scopeing and allow for some situations where
+;lambdas return lambdas that use the outer lambdas parameters.
 
-;NOTE the checking to make sure that variables in the body of
-;a lambda are valid at the time the lambda is created is
-;done to make sure that lambdas do not reference variables that
-;have not been declared yet. This could lead to dynamic scoping.
-;Also in order to ensure that variables referenced when a lambda
-;is created do not refer to other versions of those variables
-;any data variables are replaced with their values when a lambda
-;is created. Thus preventing dynamic scopeing. And also this
-;allows functions to be return another function that uses
-;parameters from the first.
-
-;NOTE it would be better if I didn't have a list of keywords and
-;3 symbol tables, but it would require changing a bunch of other
-;things. This also ties into the big conditional statement that
-;is in my-eval. If I could have all operators and their
-;associated procedures in one table it might make that function
-;a little smoother. Certainly if one wanted to add more features
-;to the language set this interpreter evaluates it would be
-;necessary to set things up a little differently.
-
-;NOTE i am not sure that having startEval and my-eval is really
-;necessary. my-eval is not really recursive except that it is
-;called inside the functions that it calls.
-;This could be useful if I were to want to put some variables on
-;the stack right at the begginning. I could do it before I call
-;eval rec.
-
-;NOTE it may be possible to include the keywords in the stack at
-;the top level by just having their value be their symbol instead
-;of their procedure. Then as it does it can return the symbol
-;so that the expression can be reevaluated with the symbol in
-;place instead of the variable that points to that symbol.
-;This would reduce some of the complexity of checking for
-;variables in the lambda body.
-
-;NOTE what happens when you pass too many or two few arguments
-;to a lambda with your interpreter? Probably just because a
-;new function is created that will try to work with a specific
-;number of variables and arguments to them it will complain about
-;too few. But it may just discard extras with too many? This
-;probably doesn't matter so much because again we are expecting
-;a valid racket program, but it is worth thinking about.
 
 ;CONSTANTS #######################################################
 
-;A value for declared but unitialized variables
-;specifically in letrec
+;A value for declared but unitialized variables in letrec
 (define UN_INIT 'uninit)
-(define TEMP_PROC 'tempproc)
 
-
-;Expressions ###################################################
-
-;Create a procedure for unary operators that takes a list of arguments
-(define (unary-op proc)
-  (lambda (x)
-    (proc (my-eval (car x)))))
-
-;Create a new procedure from a binary procedure. The new procedure
-;takes a list of arguments instead of 2 and will run proc on the
-;evaluated results of the first 2 arguments.
-;Aditional arguments will be discarded.
-(define (binary-op proc)
-  (lambda (x)
-    (proc (my-eval (car x)) (my-eval (cadr x)))))
-
-;Tests to see if all elements of a list are equal
-;x -> a list
-;Returns true if all elements in x are equal?
-(define (my-equal? x)
-  (andmap (lambda (y)
-            (equal? (my-eval (car x)) (my-eval y)))
-          (cdr x)))
-
-;Rules for evaluating if expresion
-;x -> a list of arguments
-;ie) (if (x) #t #f)
-;Returns the result of applying if to the first 3 arguments
-(define (my-if x)
-  (let ([__cond (car x)]
-        [__then (cadr x)]
-        [__else (caddr x)])
-    ;Call if with the evaluated results of the given if
-    ;expressions condition, then, and else expressions
-    (if (my-eval __cond)
-      (my-eval __then)
-      (my-eval __else))))
-
-;Rule for a lambda expression
-;x -> a lambda expression
-;ie) (lambda (x) x)
-;Returns a proceudeure that takes a list of arguments
-(define (my-lambda x)
-  ;Replace all variables in the body with their values, not procedures.
-  (define body (replaceVars (car x) (cdr x)))
-  (checkBody (car x) body)  ;check for undeclared variables in body. If both replace and check were done in one call it could be return the body to __body in the let expression as that will evaluate when the lambda is created not when it is called later.
-  ;Create a procedure to execute the body of the lambdaexp
-  ;and deal with all ags and variables.
-  (lambda (args)
-    (let* ([__vars (make-hash)]
-           [__param (car x)]
-           [__body body])
-      ;When the procedure is called initialize all parameters
-      ;from the passed list of arguments and push the table
-      ;onto the stack
-      (for-each (lambda (k v)
-                  (hash-set! __vars k (my-eval v)))
-                __param args)
-      (push __vars)
-      ;Evaluates all the expressions in the body and return the
-      ;result.
-      (let ([res (iter my-eval __body)])
-        (pop)  ;Pop local vars off the stack
-        res))))
-
-;Rule for let expressions
-;x -> an expression starting with let
-;ie) (let ([x 5]) (+ x 7))
-;Returns the result of the last expression in the let body
-(define (my-let x)
-  (let ([__vars (make-hash)]
-        [__defs (car x)]
-        [__body (cdr x)])
-    ;For every definition pair in the let's definition section
-    ;store the variable and evaluated value in the table
-    (for-each (lambda (y)
-                 (hash-set! __vars (car y) (my-eval (cadr y))))
-              __defs)
-    ;Push the table onto the stack after evaluating all the
-    ;values to be stored because let does not allow assignment
-    ;with variables that are being declared in it's own scope
-    (push __vars)
-    ;Evaluates all the expressions in the body and pops the
-    ;parameter table off the stack. Then returns the result
-    ;of the last evaluated expression.
-    (let ([res (iter my-eval __body)])
-      (pop)
-      res)))
-
-;Rule for letrec
-;Allows referencing uninitialized variables
-;x -> an expression starting with letrec
-;Returns the result of the last expression in the letrec body
-(define (my-letrec x)
-  (let ([__vars (make-hash)]
-        [__defs (car x)]
-        [__body (cdr x)])
-    ;Initialize all variables to the table as UN_INIT and push
-    ;it to the stack. This allows for them to be referenced
-    ;in following assignment expressions. However, it still
-    ;does not allow their values to be used.
-    (for-each (lambda (y)
-                 (hash-set! __vars (car y) UN_INIT))
-              __defs)
-    (push __vars)
-    ;Evaluates all the variable definitions, but doesn't allow
-    ;variables in this scope to be used for assignments
-    (for-each letrecAsn __defs)
-    ;Same as letexpr above
-    (let ([res (iter my-eval __body)])
-      (pop)
-      res)))
-
-;Rule for evaluating expressions that have anonymous lambdas
-;for their procedure. ie) '((lambda (x y) (+ x y)) 10 20)
-(define (funcexpr x)
-  (if (not (pair? (car x)))
-    (my-eval x)
-    (my-eval ((funcexpr (car x)) (cdr x)))))
 
 ;BUILTINS ########################################################
 
 ;; Make this a function and have it return the list
 ;Hash table of built-in procedures to maintain on the stack
-(define (keywords)
+(define (builtin)
   (hash
     'cdr (unary-op cdr)
     'car (unary-op car)
@@ -211,8 +50,23 @@
     'let my-let
     'letrec my-letrec))
 
-;LOCAL BINDINGS ##################################################
+;Redefine a given unary procedure to be a procedure that takes
+;a list of arguments and uses the first one. The new procedure
+;discards any additional arguments.
+;proc -> a racket procedure
+(define (unary-op proc)
+  (lambda (x)
+    (proc (my-eval (car x)))))
 
+;Same as above but the resulting procedure uses the
+;first 2 arguments.
+;proc -> a racket procedure
+(define (binary-op proc)
+  (lambda (x)
+    (proc (my-eval (car x)) (my-eval (cadr x)))))
+
+
+;VARIABLE BINDINGS ##############################################
 
 ;Stack for local variable tables
 (define local '())
@@ -244,24 +98,6 @@
   ;Call the recursive function on the local variable stack
   (rec local))
 
-;Looks for variable in the local variable list
-;Returns true if the variable is found
-;Otherwise false
-;v -> a variable name
-(define (var? v)
-  ;Recursive function to find a variable in the local stack
-  ;x -> is the stack
-  (define (rec x)
-    (cond
-    [(null? x)
-      #f]
-    [(hash-has-key? (car x) v)
-      #t]
-    [else
-      (rec (cdr x))]))
-  ;Call the recursive function on the local variable stack
-  (rec local))
-
 ;Raises an error for variables that are referenced before they
 ;they have been declared
 ;x -> the name of the variable that caused the problem
@@ -275,7 +111,7 @@
 ;x -> a quoted racket program - ie) '(+ 3 (- 10 5))
 ;Returns the result of the program
 (define (startEval x)
-  (push (keywords))
+  (push (builtin))
   (my-eval x))
 
 ;Recursive function to evaluate list programs
@@ -312,77 +148,169 @@
             "Error: expected a procedure\n  given: ~a"
             (car x)))))]))
 
-;Helpers #########################################################
 
-;; This needs to do both the below actions and needs to work
-;; with the current variable scheme
+;SIMPLE EXPRESSIONS #############################################
 
-;Recursivley Checks a list to make sure that no variables are
-;referenced before they are initialized. This prevents one kind
-;of dynamic scoping problem.
-;args -> a list of the lambdas argument variables
-;x -> a list containing all the expressions in the body
-;of the lambda
-(define (checkBody args x)
-  (if (null? x) ;If x is empty stop
-    #t
-    (let ([__head (car x)]
-          [__tail (cdr x)])
+;Tests to see if all elements of a list are equal
+;x -> a list
+;Returns true if all elements in x are equal?
+(define (my-equal? x)
+  (andmap (lambda (y)
+            (equal? (my-eval (car x)) (my-eval y)))
+          (cdr x)))
+
+;Rules for evaluating if expresion
+;x -> a list of arguments
+;ie) (if (x) #t #f)
+;Returns the result of applying if to the first 3 arguments
+(define (my-if x)
+  (let ([__cond (car x)]
+        [__then (cadr x)]
+        [__else (caddr x)])
+    ;Call if with the evaluated results of the given if
+    ;expressions condition, then, and else expressions
+    (if (my-eval __cond)
+      (my-eval __then)
+      (my-eval __else))))
+
+;Rule for evaluating expressions that have anonymous lambdas
+;for their procedure. ie) '((lambda (x y) (+ x y)) 10 20)
+(define (funcexpr x)
+  (if (not (pair? (car x)))
+    (my-eval x)
+    (my-eval ((funcexpr (car x)) (cdr x)))))
+
+;LAMBDA #########################################################
+
+;Rule for a lambda expression
+;x -> a lambda expression
+;ie) (lambda (x) x)
+;Returns a proceudeure that takes a list of arguments
+(define (my-lambda x)
+  ;Prevent referencing unbound variables and replace any variables
+  ;with their values if possible.
+  (define body (check-body (car x) (cdr x)))
+  ;Create a procedure to execute the body of the lambdaexp
+  ;and deal with all ags and variables.
+  (lambda (args)
+    (let* ([__vars (make-hash)]
+           [__param (car x)]
+           [__body body])
+      ;When the procedure is called initialize all parameters
+      ;from the passed list of arguments and push the table
+      ;onto the stack
+      (for-each (lambda (k v)
+                  (hash-set! __vars k (my-eval v)))
+                __param args)
+      (push __vars)
+      ;Evaluates all the expressions in the body and return the
+      ;result.
+      (let ([res (map-last my-eval __body)])
+        (pop)  ;Pop local vars off the stack
+        res))))
+
+;VARIABLE CHECKING ##############################################
+
+;; Check a list of expressions for valid variables
+(define (check-body vars x)
+  (map (lambda (y)
+         (check-expr vars y))
+       x))
+
+;; Check an expression for valid variables
+(define (check-expr vars x)
+  (if (pair? x)
+    (let ([__proc (car x)]
+          [__args (cdr x)])
+      ;(println __proc)
+      ;(println __args)
       (cond
-      ;If x is a list check it too
-      [(list? __head)
-        (checkBody args __head)]
-      ;If x is a symbol and it is not a keyword, variable, or
-      ;argument to the lambda then raise an exception
-      [(and (symbol? __head)
-            (not (or
-              (member __head args)
-              (var? __head))))
-        (ref-error __head)]
-      ;Makes sure to add the parameters of a lambda that is
-      ;defined inside x
-      [(equal? __head 'lambda)
-        (set! args (append (car __tail) args))]
-      ;Makes sure to add the variable names of a let that is
-      ;defined inside x
-      [(or (equal? __head 'let)
-           (equal? __head 'letrec))
-        (set! args
-          (append
-            (map (lambda (x) (car x)) (car __tail))
-            args))])
-      ;Recursive call on the rest of the list
-      (checkBody args __tail))))
+      [(equal? 'lambda __proc)
+        (check-vars (append (cadr x) vars) x)]
+      [(or (equal? 'let __proc)
+           (equal? 'letrec __proc))
+        (check-vars (append (map car (cadr x)) vars) x)]
+      [else
+        (check-vars vars x)]))
+    (replace-var vars x)))
 
-;Goes through a list and replaces all currently assigned variables
-;with their associated values.
-;Needed to create and return functions in other functions
-;because when the function is
-;called the parameters of the function that created it are no
-;longer on the stack.
-;Also ensures that variables in the lambda body are bound to
-;the values they have when the procedure is created and will not
-;change to a different value when the function is called. Thus
-;preventing another kind of dynamic scoping problem.
-;Makes sure not to do this with procedures or UN_INIT variables
-(define (replaceVars args x)
+;; Check all parts of an expression to make sure they are valid
+;; variables and replace the ones that can be
+(define (check-vars vars x)
   (define (rec y)
     (if (list? y)
-      (map rec y)
-      (if (and (not (member y args))
-               (var? y)  ;; guards the following lookups
-               (not (procedure? (lookup y)))
-               (not (equal? (lookup y) UN_INIT)))
-        (lookup y)
-        y)))
+      (check-expr vars y)
+      (replace-var vars y)))
   (map rec x))
+
+;; Replace a variable if it can be. Or throw an error if it
+;; isn't a valid variable
+(define (replace-var vars x)
+  (if (and (symbol? x)
+           (not (member x vars)))
+      (let ([v (lookup x)])
+         (if (and (not (procedure? v))
+                  (not (equal? v UN_INIT)))
+            v
+            x))
+        x))
+
+;LET/LETREC #####################################################
+
+;Rule for let expressions
+;x -> an expression starting with let
+;ie) (let ([x 5]) (+ x 7))
+;Returns the result of the last expression in the let body
+(define (my-let x)
+  (let ([__vars (make-hash)]
+        [__defs (car x)]
+        [__body (cdr x)])
+    ;For every definition pair in the let's definition section
+    ;store the variable and evaluated value in the table
+    (for-each (lambda (y)
+                 (hash-set! __vars (car y) (my-eval (cadr y))))
+              __defs)
+    ;Push the table onto the stack after evaluating all the
+    ;values to be stored because let does not allow assignment
+    ;with variables that are being declared in it's own scope
+    (push __vars)
+    ;Evaluates all the expressions in the body and pops the
+    ;parameter table off the stack. Then returns the result
+    ;of the last evaluated expression.
+    (let ([res (map-last my-eval __body)])
+      (pop)
+      res)))
+
+;Rule for letrec
+;Allows referencing uninitialized variables
+;x -> an expression starting with letrec
+;Returns the result of the last expression in the letrec body
+(define (my-letrec x)
+  (let ([__vars (make-hash)]
+        [__defs (car x)]
+        [__body (cdr x)])
+    ;Initialize all variables to the table as UN_INIT and push
+    ;it to the stack. This allows for them to be referenced
+    ;in following assignment expressions. However, it still
+    ;does not allow their values to be used.
+    (for-each (lambda (y)
+                 (hash-set! __vars (car y) UN_INIT))
+              __defs)
+    (push __vars)
+    ;Evaluates all the variable definitions, but doesn't allow
+    ;variables in this scope to be used for assignments
+    (for-each lrec-assn __defs)
+    ;Same as letexpr above
+    (let ([res (map-last my-eval __body)])
+      (pop)
+      res)))
 
 ;Assigns a variable and its evaluated value to the stack.
 ;Raises an error if an expression returns UN_INIT so that
 ;variables that have not been properly initalized yet
 ;cannot be used for assignment
 ;x -> a variable value pair
-(define (letrecAsn x)
+(define (lrec-assn x)
   (hash-set! (car local)
              (car x)
              ;Save the result of the evaluated value expression
@@ -393,22 +321,13 @@
                  (ref-error __val)
                  __val))))
 
-;Applies a function to every element of a list of expressions
-;similar to for-each except it returns the result of the last
-;application of f
-;f -> a function to apply to all expressions
-;x -> a list of expressions
-;Returns the value of the last application of f
-(define (iter f x)
-  ;Recursive function to apply f to every element of x
-  ;res -> is the result of the last expression
-  ;y -> is a list of expressions
-  (define (rec y res)
-    (cond
-    [(null? y)
-      res]
-    [else
-      (rec (cdr y) (f (car y)))]))
-  ;Call the recursive function on x with void for the result
-  ;since no expression has returned a result yet
-  (rec x (void)))
+;HELPERS ########################################################
+
+;; Map a given procedure onto every element in a list and return
+;; the result of the last application
+(define (map-last proc x)
+  (letrec ([f (lambda (y res)
+                (if (null? y)
+                  res
+                  (f (cdr y) (proc (car y)))))])
+    (f x (void))))
