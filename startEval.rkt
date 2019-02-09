@@ -196,8 +196,9 @@
 
 ;BUILTINS ########################################################
 
+;; Make this a function and have it return the list
 ;Hash table of built-in procedures to maintain on the stack
-(define keywords
+(define (keywords)
   (hash
     'cdr (unary-op cdr)
     'car (unary-op car)
@@ -221,6 +222,7 @@
     'letrec my-letrec))
 
 ;LOCAL BINDINGS ##################################################
+
 
 ;Stack for local variable tables
 (define local '())
@@ -283,7 +285,7 @@
 ;x -> a quoted racket program - ie) '(+ 3 (- 10 5))
 ;Returns the result of the program
 (define (startEval x)
-  (push keywords)
+  (push (keywords))
   (evalRec x))
 
 ;Recursive function to evaluate list programs
@@ -321,6 +323,9 @@
             (car x)))))]))
 
 ;Helpers #########################################################
+
+;; This needs to do both the below actions and needs to work
+;; with the current variable scheme
 
 ;Recursivley Checks a list to make sure that no variables are
 ;referenced before they are initialized. This prevents one kind
