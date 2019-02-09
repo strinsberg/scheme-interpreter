@@ -84,7 +84,7 @@
     '>= (binary-op >=)
     '> (binary-op >)
     'cons (binary-op cons)
-    'equal? my-equal?
+    'equal? (binary-op equal?)
     'quote (lambda (x) (quasiquote (unquote (car x))))
     'list (lambda (x) (map my-eval x))
     'if my-if
@@ -146,15 +146,6 @@
 
 ;SIMPLE EXPRESSIONS #############################################
 
-;Tests to see if all elements of a list are equal
-;x -> a list
-;Returns true if all elements in x are equal?
-(define (my-equal? x)
-  (let ([val (my-eval (car x))])
-    (andmap (lambda (y)
-              (equal? val (my-eval y)))
-            (cdr x))))
-
 ;Rules for evaluating if expresion
 ;x -> a list of arguments
 ;ie) (if (x) #t #f)
@@ -169,18 +160,20 @@
       (my-eval __then)
       (my-eval __else))))
 
-;Rule for evaluating expressions that have anonymous lambdas
-;for their procedure. ie) '((lambda (x y) (+ x y)) 10 20)
+;Evaluates expressions that have expressions as their
+;procedure. Ie) anonymus lambdas or let expressions that create
+;and return procedures in their body.
+;x -> an expression with an expression as its procedure
 (define (func-expr x)
   (if (not (pair? (car x)))
     (my-eval x)
     (my-eval ((func-expr (car x)) (cdr x)))))
 
+
 ;LAMBDA #########################################################
 
-;Rule for a lambda expression
+;Evaluates a lambda expression
 ;x -> a lambda expression
-;ie) (lambda (x) x)
 ;Returns a proceudeure that takes a list of arguments
 (define (my-lambda x)
   ;Prevent referencing unbound variables and replace any variables
@@ -207,13 +200,13 @@
 
 ;VARIABLE CHECKING ##############################################
 
-;; Check a list of expressions for valid variables
+;; Checks a list of expressions for valid variables
 (define (check-body vars x)
   (map (lambda (y)
          (check-expr vars y))
        x))
 
-;; Check an expression for valid variables
+;; Checks an expression for valid variables
 (define (check-expr vars x)
   (if (pair? x)
     (let ([__proc (car x)]
@@ -230,7 +223,7 @@
         (check-vars vars x)]))
     (replace-var vars x)))
 
-;; Check all parts of an expression to make sure they are valid
+;; Checks all parts of an expression to make sure they are valid
 ;; variables and replace the ones that can be
 (define (check-vars vars x)
   (define (rec y)
@@ -239,7 +232,7 @@
       (replace-var vars y)))
   (map rec x))
 
-;; Replace a variable if it can be. Or throw an error if it
+;; Replaces a variable if it can be. Or throw an error if it
 ;; isn't a valid variable
 (define (replace-var vars x)
   (if (and (symbol? x)
@@ -253,9 +246,8 @@
 
 ;LET/LETREC #####################################################
 
-;Rule for let expressions
+;Evaluates a let expression
 ;x -> an expression starting with let
-;ie) (let ([x 5]) (+ x 7))
 ;Returns the result of the last expression in the let body
 (define (my-let x)
   (let ([__vars (make-hash)]
@@ -277,7 +269,7 @@
       (pop)
       res)))
 
-;Rule for letrec
+;Evaluates letrec expressions
 ;Allows referencing uninitialized variables
 ;x -> an expression starting with letrec
 ;Returns the result of the last expression in the letrec body
@@ -302,9 +294,7 @@
       res)))
 
 ;Assigns a variable and its evaluated value to the stack.
-;Raises an error if an expression returns UN_INIT so that
-;variables that have not been properly initalized yet
-;cannot be used for assignment
+;If its value is an uninitialized variable it returns an error.
 ;x -> a variable value pair
 (define (lrec-assn x)
   (hash-set! (car stack) ;; this might be better changed
