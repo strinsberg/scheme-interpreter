@@ -28,14 +28,14 @@
 ;NOTE it would be better if I didn't have a list of keywords and
 ;3 symbol tables, but it would require changing a bunch of other
 ;things. This also ties into the big conditional statement that
-;is in evalRec. If I could have all operators and their
+;is in my-eval. If I could have all operators and their
 ;associated procedures in one table it might make that function
 ;a little smoother. Certainly if one wanted to add more features
 ;to the language set this interpreter evaluates it would be
 ;necessary to set things up a little differently.
 
-;NOTE i am not sure that having startEval and evalRec is really
-;necessary. evalRec is not really recursive except that it is
+;NOTE i am not sure that having startEval and my-eval is really
+;necessary. my-eval is not really recursive except that it is
 ;called inside the functions that it calls.
 ;This could be useful if I were to want to put some variables on
 ;the stack right at the begginning. I could do it before I call
@@ -70,7 +70,7 @@
 ;Create a procedure for unary operators that takes a list of arguments
 (define (unary-op proc)
   (lambda (x)
-    (proc (evalRec (car x)))))
+    (proc (my-eval (car x)))))
 
 ;Create a new procedure from a binary procedure. The new procedure
 ;takes a list of arguments instead of 2 and will run proc on the
@@ -78,14 +78,14 @@
 ;Aditional arguments will be discarded.
 (define (binary-op proc)
   (lambda (x)
-    (proc (evalRec (car x)) (evalRec (cadr x)))))
+    (proc (my-eval (car x)) (my-eval (cadr x)))))
 
 ;Tests to see if all elements of a list are equal
 ;x -> a list
 ;Returns true if all elements in x are equal?
 (define (my-equal? x)
   (andmap (lambda (y)
-            (equal? (evalRec (car x)) (evalRec y)))
+            (equal? (my-eval (car x)) (my-eval y)))
           (cdr x)))
 
 ;Rules for evaluating if expresion
@@ -98,9 +98,9 @@
         [__else (caddr x)])
     ;Call if with the evaluated results of the given if
     ;expressions condition, then, and else expressions
-    (if (evalRec __cond)
-      (evalRec __then)
-      (evalRec __else))))
+    (if (my-eval __cond)
+      (my-eval __then)
+      (my-eval __else))))
 
 ;Rule for a lambda expression
 ;x -> a lambda expression
@@ -120,12 +120,12 @@
       ;from the passed list of arguments and push the table
       ;onto the stack
       (for-each (lambda (k v)
-                  (hash-set! __vars k (evalRec v)))
+                  (hash-set! __vars k (my-eval v)))
                 __param args)
       (push __vars)
       ;Evaluates all the expressions in the body and return the
       ;result.
-      (let ([res (iter evalRec __body)])
+      (let ([res (iter my-eval __body)])
         (pop)  ;Pop local vars off the stack
         res))))
 
@@ -140,7 +140,7 @@
     ;For every definition pair in the let's definition section
     ;store the variable and evaluated value in the table
     (for-each (lambda (y)
-                 (hash-set! __vars (car y) (evalRec (cadr y))))
+                 (hash-set! __vars (car y) (my-eval (cadr y))))
               __defs)
     ;Push the table onto the stack after evaluating all the
     ;values to be stored because let does not allow assignment
@@ -149,7 +149,7 @@
     ;Evaluates all the expressions in the body and pops the
     ;parameter table off the stack. Then returns the result
     ;of the last evaluated expression.
-    (let ([res (iter evalRec __body)])
+    (let ([res (iter my-eval __body)])
       (pop)
       res)))
 
@@ -173,7 +173,7 @@
     ;variables in this scope to be used for assignments
     (for-each letrecAsn __defs)
     ;Same as letexpr above
-    (let ([res (iter evalRec __body)])
+    (let ([res (iter my-eval __body)])
       (pop)
       res)))
 
@@ -181,8 +181,8 @@
 ;for their procedure. ie) '((lambda (x y) (+ x y)) 10 20)
 (define (funcexpr x)
   (if (not (pair? (car x)))
-    (evalRec x)
-    (evalRec ((funcexpr (car x)) (cdr x)))))
+    (my-eval x)
+    (my-eval ((funcexpr (car x)) (cdr x)))))
 
 ;BUILTINS ########################################################
 
@@ -205,7 +205,7 @@
     'cons (binary-op cons)
     'equal? my-equal?
     'quote (lambda (x) (quasiquote (unquote (car x))))
-    'list (lambda (x) (map evalRec x))
+    'list (lambda (x) (map my-eval x))
     'if my-if
     'lambda my-lambda
     'let my-let
@@ -276,14 +276,14 @@
 ;Returns the result of the program
 (define (startEval x)
   (push (keywords))
-  (evalRec x))
+  (my-eval x))
 
 ;Recursive function to evaluate list programs
 ;Calls all the functions for each kind of expression
 ;depending on what type of expression x is
 ;x -> a racket expression
 ;Returns the result of the expression
-(define (evalRec x)
+(define (my-eval x)
   (cond
   ;If x is a symbol look its value up on the stack. If it exists
   ;return it. Otherwise lookup will raise an error.
@@ -386,7 +386,7 @@
   (hash-set! (car local)
              (car x)
              ;Save the result of the evaluated value expression
-             (let ([__val (evalRec (cadr x))])
+             (let ([__val (my-eval (cadr x))])
                ;If it is uninitialized raise an error
                ;else return the result
                (if (equal? UN_INIT __val)
