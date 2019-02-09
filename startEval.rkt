@@ -26,15 +26,13 @@
 ;EVAL ############################################################
 
 ;Evaluates a racket program
-;x -> a quoted racket program - ie) '(+ 3 (- 10 5))
+;x -> a racket program
 ;Returns the result of the program
 (define (startEval x)
   (push (builtin))
   (my-eval x))
 
-;Recursive function to evaluate list programs
-;Calls all the functions for each kind of expression
-;depending on what type of expression x is
+;Evaluates a racket expression/program
 ;x -> a racket expression
 ;Returns the result of the expression
 (define (my-eval x)
@@ -51,7 +49,7 @@
   ;If the first element is a pair, then that element is a function
   ;that returns a procedure. So evaluate it as such.
   [(pair? (car x))
-    (funcexpr x)]
+    (func-expr x)]
   ;Otherwise if first element is not a pair then it is a single
   ;data type so look it up in the symbol table. If its value
   ;is a procedure run it on the list of arguments. Otherwise
@@ -69,8 +67,8 @@
 
 ;BUILTINS ########################################################
 
-;; Make this a function and have it return the list
-;Hash table of built-in procedures to maintain on the stack
+;; Returns a hash table with all builtin function names and their
+;; procedures.
 (define (builtin)
   (hash
     'cdr (unary-op cdr)
@@ -152,9 +150,10 @@
 ;x -> a list
 ;Returns true if all elements in x are equal?
 (define (my-equal? x)
-  (andmap (lambda (y)
-            (equal? (my-eval (car x)) (my-eval y)))
-          (cdr x)))
+  (let ([val (my-eval (car x))])
+    (andmap (lambda (y)
+              (equal? val (my-eval y)))
+            (cdr x))))
 
 ;Rules for evaluating if expresion
 ;x -> a list of arguments
@@ -172,10 +171,10 @@
 
 ;Rule for evaluating expressions that have anonymous lambdas
 ;for their procedure. ie) '((lambda (x y) (+ x y)) 10 20)
-(define (funcexpr x)
+(define (func-expr x)
   (if (not (pair? (car x)))
     (my-eval x)
-    (my-eval ((funcexpr (car x)) (cdr x)))))
+    (my-eval ((func-expr (car x)) (cdr x)))))
 
 ;LAMBDA #########################################################
 
