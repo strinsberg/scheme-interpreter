@@ -55,7 +55,7 @@
   (hash
     'cdr (unary-op cdr)
     'car (unary-op car)
-    'null? (unary-op null?)
+    'null? (unary-op null?)  ;; extra
     'pair? (unary-op pair?)
     '+ (binary-op +)
     '- (binary-op -)
@@ -69,11 +69,13 @@
     'cons (binary-op cons)
     'equal? (binary-op equal?)
     'quote (lambda (x) (quasiquote (unquote (car x))))
-    'list (lambda (x) (map my-eval x))
+    'list (lambda (x) (map my-eval x))  ;; extra
     'if my-if
     'lambda my-lambda
     'let my-let
-    'letrec my-letrec))
+    'letrec my-letrec
+    'cond my-cond  ;; extra
+    ))
 
 ;; Redefine a given unary procedure to be a procedure that takes
 ;; a list of arguments and uses the first one. The new procedure
@@ -297,9 +299,21 @@
   [else
     (member? e (cdr x))]))
 
-;; EXTRA #########################################################
-;Anything here is extra to the project description
-;I just added it out of interest and for fun
 
-(define (my-cond)
-  #t)
+;; EXTRA #########################################################
+;; Anything here is extra to the project description
+;; I just added it out of interest and for fun
+
+;; Evaluates the arguments to a cond expression
+;; x -> a list of arguments to a cond expresion
+;; Returns the result of the body of the evaluated conditional
+;; or void if none of the conditionals are true
+(define (my-cond x)
+  (cond
+  [(not (null? x))
+    (let* ([__stmt (car x)]
+           [__cond (car __stmt)]
+           [__body (cdr __stmt)])
+    (if (my-eval __cond)
+      (map-last my-eval __body)
+      (my-cond (cdr x))))]))

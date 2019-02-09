@@ -26,7 +26,7 @@
 ;Test with single data values
 (test '4 "-- Test with a number --")
 (test '"hello" "-- Test with a string --")
-;(test '() '() "-- Test with an empty list --")
+(test '#t "-- Test with an empty list --")
 
 ;Test arithmetic operators
 (test  '(+ (- 20 5)
@@ -187,6 +187,18 @@
                           (15 () ())
                           (16 () ())))))
         "-- Finding the height of a tree --")
+
+;; test cond
+(test '(letrec ([member? (lambda (e x)
+                            (cond
+                            [(null? x)
+                              #f]
+                            [(equal? e (car x))
+                              #t]
+                            [#t
+                              (member? e (cdr x))]))])
+              (member? 4 (list 3 6 5 2 4 6)))
+      "-- Test cond with a member function --")
 
 ;Print test results
 (if (= failed 0)
