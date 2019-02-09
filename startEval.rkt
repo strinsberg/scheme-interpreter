@@ -176,43 +176,47 @@
 ;x -> a lambda expression
 ;Returns a proceudeure that takes a list of arguments
 (define (my-lambda x)
-  ;Prevent referencing unbound variables and replace any variables
-  ;with their values if possible.
   (define body (check-body (car x) (cdr x)))
-  ;Create a procedure to execute the body of the lambdaexp
-  ;and deal with all ags and variables.
+  ;; Create and return the new procedure
   (lambda (args)
     (let* ([__vars (make-hash)]
            [__param (car x)]
            [__body body])
-      ;When the procedure is called initialize all parameters
-      ;from the passed list of arguments and push the table
-      ;onto the stack
+      ;; Initialize all variables from the list of arguments
+      ;; and push them onto the stack
       (for-each (lambda (k v)
                   (hash-set! __vars k (my-eval v)))
                 __param args)
       (push __vars)
-      ;Evaluates all the expressions in the body and return the
-      ;result.
-      (let ([res (map-last my-eval __body)])
-        (pop)  ;Pop local vars off the stack
-        res))))
+      (eval-body __body))))
+
+;; Evaluate all expressions in the body of a lambda, let, or
+;; letrec and return the result of the last one evaluated
+;; after poping the local variables of the stack.
+;; x -> a list of exxpressions
+(define (eval-body x)
+  (let ([res (map-last my-eval x)])
+      (pop)
+      res))
 
 ;VARIABLE CHECKING ##############################################
 
-;; Checks a list of expressions for valid variables
+;; Checks a list of expressions for valid variables.
+;; vars -> list of valid variables that are not on the stack yet.
+;; x    -> a token or an expression
+;; Returns the list with any replacements
+;; Raises a ref-error if any variables are not in vars
+;; or on the stack
 (define (check-body vars x)
   (map (lambda (y)
          (check-expr vars y))
        x))
 
-;; Checks an expression for valid variables
+;; Checks an expression for valid variables.
 (define (check-expr vars x)
   (if (pair? x)
     (let ([__proc (car x)]
           [__args (cdr x)])
-      ;(println __proc)
-      ;(println __args)
       (cond
       [(equal? 'lambda __proc)
         (check-vars (append (cadr x) vars) x)]
@@ -223,8 +227,7 @@
         (check-vars vars x)]))
     (replace-var vars x)))
 
-;; Checks all parts of an expression to make sure they are valid
-;; variables and replace the ones that can be
+;; Checks the variables of an expression.
 (define (check-vars vars x)
   (define (rec y)
     (if (list? y)
@@ -232,11 +235,11 @@
       (replace-var vars y)))
   (map rec x))
 
-;; Replaces a variable if it can be. Or throw an error if it
-;; isn't a valid variable
+;; Returns a variables value if possible, otherwise
+;; returns the variable
 (define (replace-var vars x)
   (if (and (symbol? x)
-           (not (member x vars)))
+           (not (member? x vars)))
       (let ([v (lookup x)])
          (if (and (not (procedure? v))
                   (not (equal? v UN_INIT)))
@@ -246,74 +249,77 @@
 
 ;LET/LETREC #####################################################
 
-;Evaluates a let expression
-;x -> an expression starting with let
-;Returns the result of the last expression in the let body
+;; Evaluates a let expression
+;; x -> a list of the arguments to a let expression
+;; Returns the result of the last expression in the let body
 (define (my-let x)
   (let ([__vars (make-hash)]
         [__defs (car x)]
         [__body (cdr x)])
-    ;For every definition pair in the let's definition section
-    ;store the variable and evaluated value in the table
+    ;; Initalize all variable value pairs and push onto the stack
     (for-each (lambda (y)
                  (hash-set! __vars (car y) (my-eval (cadr y))))
               __defs)
-    ;Push the table onto the stack after evaluating all the
-    ;values to be stored because let does not allow assignment
-    ;with variables that are being declared in it's own scope
     (push __vars)
-    ;Evaluates all the expressions in the body and pops the
-    ;parameter table off the stack. Then returns the result
-    ;of the last evaluated expression.
-    (let ([res (map-last my-eval __body)])
-      (pop)
-      res)))
+    (eval-body __body)))
 
-;Evaluates letrec expressions
-;Allows referencing uninitialized variables
-;x -> an expression starting with letrec
-;Returns the result of the last expression in the letrec body
+;; Evaluates letrec expressions
+;; x -> a list of the arguments to a letrec expression
+;; Returns the result of the last expression in the letrec body
 (define (my-letrec x)
   (let ([__vars (make-hash)]
         [__defs (car x)]
         [__body (cdr x)])
-    ;Initialize all variables to the table as UN_INIT and push
-    ;it to the stack. This allows for them to be referenced
-    ;in following assignment expressions. However, it still
-    ;does not allow their values to be used.
+    ;Initialize all variables to the table as UN_INIT
     (for-each (lambda (y)
                  (hash-set! __vars (car y) UN_INIT))
               __defs)
     (push __vars)
-    ;Evaluates all the variable definitions, but doesn't allow
-    ;variables in this scope to be used for assignments
     (for-each lrec-assn __defs)
-    ;Same as letexpr above
-    (let ([res (map-last my-eval __body)])
-      (pop)
-      res)))
+    (eval-body __body)))
 
-;Assigns a variable and its evaluated value to the stack.
-;If its value is an uninitialized variable it returns an error.
-;x -> a variable value pair
+;; Assigns a variable and its evaluated value to the stack.
+;; x -> a variable value pair
+;; Raises ref-error if the value is an uninitalized variable
 (define (lrec-assn x)
-  (hash-set! (car stack) ;; this might be better changed
+  (hash-set! (car stack)
              (car x)
-             ;Save the result of the evaluated value expression
              (let ([__val (my-eval (cadr x))])
-               ;If it is uninitialized raise an error
-               ;else return the result
+               ;; Don't allow values to be uninitialized vars
                (if (equal? UN_INIT __val)
                  (ref-error __val)
                  __val))))
 
-;HELPERS ########################################################
+;; HELPERS ######################################################
 
 ;; Map a given procedure onto every element in a list and return
 ;; the result of the last application
+;; proc -> a procedure to apply
+;; x    -> a list
+;; Returns the result of the last application of the procedure
 (define (map-last proc x)
   (letrec ([f (lambda (y res)
                 (if (null? y)
                   res
                   (f (cdr y) (proc (car y)))))])
     (f x (void))))
+
+;; Check if an element is a member of a list
+;; e -> element to search for
+;; x -> a list
+;; Returns #t if e is a member of x, #f if not
+(define (member? e x)
+  (cond
+  [(null? x)
+    #f]
+  [(equal? e (car x))
+    #t]
+  [else
+    (member? e (cdr x))]))
+
+;; EXTRA #########################################################
+;Anything here is extra to the project description
+;I just added it out of interest and for fun
+
+(define (my-cond)
+  #t)
