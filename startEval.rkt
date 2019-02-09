@@ -65,19 +65,164 @@
 (define TEMP_PROC 'tempproc)
 
 
-;SYMBOL TABLES ###################################################
+;Expressions ###################################################
 
-;All available keywords
-(define keywords (list '+ '- '* '/ 'equal? '= '<= '< '>= '> 'cdr
-  'car 'cons 'pair? 'list 'lambda 'let 'letrec 'quote 'if))
+;Create a procedure for unary operators that takes a list of arguments
+(define (unary-op proc)
+  (lambda (x)
+    (proc (evalRec (car x)))))
 
-;Symbol tables to group like symbols and, if needed, to hold their
-;associated procedure
-(define op (hash '+ + '- - '* * '/ /))
-(define relop (hash 'equal? equal? '= = '<= <= '< < '>= >= '> >))
-(define listop (hash 'cdr #t 'car #t 'cons #t 'pair? #t 'list #t))
+;Create a new procedure from a binary procedure. The new procedure
+;takes a list of arguments instead of 2 and will run proc on the
+;evaluated results of the first 2 arguments.
+;Aditional arguments will be discarded.
+(define (binary-op proc)
+  (lambda (x)
+    (proc (evalRec (car x)) (evalRec (cadr x)))))
+
+;Tests to see if all elements of a list are equal
+;x -> a list
+;Returns true if all elements in x are equal?
+(define (my-equal? x)
+  ;Recursivley checks if all elements of a list y equal a given
+  ;element e
+  (define (rec e y)
+    (cond
+    [(null? y)
+      #t]
+    [(not (equal? (evalRec e) (evalRec (car y))))
+      #f]
+    [else
+      (rec (car y) (cdr y))]))
+  ;Call the recursive function on the first element of x
+  ;and the rest of x
+  (rec (car x) (cdr x)))
+
+;Rules for evaluating if expresion
+;x -> a list of arguments
+;ie) (if (x) #t #f)
+;Returns the result of applying if to the first 3 arguments
+(define (my-if x)
+  (let ([__cond (car x)]
+        [__then (cadr x)]
+        [__else (caddr x)])
+    ;Call if with the evaluated results of the given if
+    ;expressions condition, then, and else expressions
+    (if (evalRec __cond)
+      (evalRec __then)
+      (evalRec __else))))
+
+;Rule for a lambda expression
+;x -> a lambda expression
+;ie) (lambda (x) x)
+;Returns a proceudeure that takes a list of arguments
+(define (my-lambda x)
+  ;Replace all variables in the body with their values, not procedures.
+  (define body (replaceVars (car x) (cdr x)))
+  (checkBody (car x) body)  ;check for undeclared variables in body. If both replace and check were done in one call it could be return the body to __body in the let expression as that will evaluate when the lambda is created not when it is called later.
+  ;Create a procedure to execute the body of the lambdaexp
+  ;and deal with all ags and variables.
+  (lambda (args)
+    (let* ([__vars (make-hash)]
+           [__param (car x)]
+           [__body body])
+      ;When the procedure is called initialize all parameters
+      ;from the passed list of arguments and push the table
+      ;onto the stack
+      (for-each (lambda (k v)
+                  (hash-set! __vars k (evalRec v)))
+                __param args)
+      (push __vars)
+      ;Evaluates all the expressions in the body and return the
+      ;result.
+      (let ([res (iter evalRec __body)])
+        (pop)  ;Pop local vars off the stack
+        res))))
+
+;Rule for let expressions
+;x -> an expression starting with let
+;ie) (let ([x 5]) (+ x 7))
+;Returns the result of the last expression in the let body
+(define (my-let x)
+  (let ([__vars (make-hash)]
+        [__defs (car x)]
+        [__body (cdr x)])
+    ;For every definition pair in the let's definition section
+    ;store the variable and evaluated value in the table
+    (for-each (lambda (y)
+                 (hash-set! __vars (car y) (evalRec (cadr y))))
+              __defs)
+    ;Push the table onto the stack after evaluating all the
+    ;values to be stored because let does not allow assignment
+    ;with variables that are being declared in it's own scope
+    (push __vars)
+    ;Evaluates all the expressions in the body and pops the
+    ;parameter table off the stack. Then returns the result
+    ;of the last evaluated expression.
+    (let ([res (iter evalRec __body)])
+      (pop)
+      res)))
+
+;Rule for letrec
+;Allows referencing uninitialized variables
+;x -> an expression starting with letrec
+;Returns the result of the last expression in the letrec body
+(define (my-letrec x)
+  (let ([__vars (make-hash)]
+        [__defs (car x)]
+        [__body (cdr x)])
+    ;Initialize all variables to the table as UN_INIT and push
+    ;it to the stack. This allows for them to be referenced
+    ;in following assignment expressions. However, it still
+    ;does not allow their values to be used.
+    (for-each (lambda (y)
+                 (hash-set! __vars (car y) UN_INIT))
+              __defs)
+    (push __vars)
+    ;Evaluates all the variable definitions, but doesn't allow
+    ;variables in this scope to be used for assignments
+    (for-each letrecAsn __defs)
+    ;Same as letexpr above
+    (let ([res (iter evalRec __body)])
+      (pop)
+      res)))
+
+;Rule for evaluating expressions that have anonymous lambdas
+;for their procedure. ie) '((lambda (x y) (+ x y)) 10 20)
+(define (funcexpr x)
+  (if (not (pair? (car x)))
+    (evalRec x)
+    (evalRec ((funcexpr (car x)) (cdr x)))))
+
+;BUILTINS ########################################################
+
+;; Make this a function and have it return the list
+;Hash table of built-in procedures to maintain on the stack
+(define (keywords)
+  (hash
+    'cdr (unary-op cdr)
+    'car (unary-op car)
+    'pair? (unary-op pair?)
+    '+ (binary-op +)
+    '- (binary-op -)
+    '* (binary-op *)
+    '/ (binary-op /)
+    '= (binary-op =)
+    '<= (binary-op <=)
+    '< (binary-op <)
+    '>= (binary-op >=)
+    '> (binary-op >)
+    'cons (binary-op cons)
+    'equal? my-equal?
+    'quote (lambda (x) (quasiquote (unquote (car x))))
+    'list (lambda (x) (map evalRec x))
+    'if my-if
+    'lambda my-lambda
+    'let my-let
+    'letrec my-letrec))
 
 ;LOCAL BINDINGS ##################################################
+
 
 ;Stack for local variable tables
 (define local '())
@@ -140,7 +285,7 @@
 ;x -> a quoted racket program - ie) '(+ 3 (- 10 5))
 ;Returns the result of the program
 (define (startEval x)
-  ;(push listop)
+  (push (keywords))
   (evalRec x))
 
 ;Recursive function to evaluate list programs
@@ -150,193 +295,37 @@
 ;Returns the result of the expression
 (define (evalRec x)
   (cond
-  ;If x is a symbol if it is a keyword that hasn't been redefined
-  ;just return it. Otherwise lookit up in the variable table
-  ;and return it's value. lookup throws
-  ;an error if x is not defined.
+  ;If x is a symbol look its value up on the stack. If it exists
+  ;return it. Otherwise lookup will raise an error.
   [(symbol? x)
-    (if (and (not (var? x)) (member x keywords))
-      x
-      (lookup x))]
-  ;If x is a number or string or any other type of single element
-  ;data then it will just be returned.
+    (lookup x)]
+  ;If x is not a pair then it should be a single data type. So
+  ;we just return this value.
   [(not (pair? x))
     x]
-  ;If the first element of a list is a variable then it is
-  ;either a procedure stored from a lambda expression or a keyword.
-  [(var? (car x))
-    (let ([v (lookup (car x))])
-      (cond
-      [(procedure? v)
-        (v (cdr x))]
-      [(member v keywords)
-        (evalRec (cons v (cdr x)))]))]
-  ;If the first element of x is an arithmetic operator
-  ;evaluate x as an arithmetic expression
-  [(hash-has-key? op (car x))
-    (aexpr x)]
-  ;If x is a relational exp
-  [(hash-has-key? relop (car x))
-    (relexpr x)]
-  ;If x is a quote exp
-  [(equal? 'quote (car x))
-    (quasiquote (unquote (cadr x)))]
-  ;If x is an if expression
-  [(equal? 'if (car x))
-    (ifexpr x)]
-  ;If the first element of x is a list procedure
-  [(hash-has-key? listop (car x))
-    (listexpr x)]
-  ;If x is a let expression
-  [(equal? 'let (car x))
-    (letexpr x)]
-  [(equal? 'letrec (car x))
-    (lrecexpr x)]
-  ;If x is a lambda expression
-  [(equal? 'lambda (car x))
-    (lambdaexpr x)]
-  ;If x is a pair then it's first element should be a procedure
-  ;And if the first element is a pair then that pair should
-  ;return a procedure. So we evaluate it as such.
+  ;If x is a pair then it's first element should be a procedure.
+  ;If the first element is a pair, then that element is a function
+  ;that returns a procedure. So evaluate it as such.
   [(pair? (car x))
     (funcexpr x)]
-  ;At this point the first element of x has not resolved to a
-  ;valid procedure so x is not a proper racket function
+  ;Otherwise if first element is not a pair then it is a single
+  ;data type so look it up in the symbol table. If its value
+  ;is a procedure run it on the list of arguments. Otherwise
+  ;raise an error, because the first element of a function should
+  ;always be a procedure
   [else
-    (raise
-      (format
-        "Error: expected a procedure\n  given: ~a"
-        (car x)))]))
+    (let ([v (lookup (car x))])
+      (if (procedure? v)
+        (v (cdr x))
+        (raise
+          (format
+            "Error: expected a procedure\n  given: ~a"
+            (car x)))))]))
 
+;Helpers #########################################################
 
-;ARITHMETIC ######################################################
-
-;Rule for evaluating binary arethmetic expresions
-;x -> an expression starting with +, -, *, or /
-;ie) (+ 3 4)
-;Returns the result of the expression
-(define (aexpr x)
-  (let ([__op (car x)]
-        [__left (cadr x)]
-        [__right (caddr x)])
-    ;Lookup the procedure for the given operator and
-    ;Call it on the evaluation of the left and right arguments
-    ((hash-ref op __op)
-      (evalRec __left)
-      (evalRec __right))))
-
-
-;RELATIONAL ######################################################
-
-;Rule for evaluating relational expresions
-;x -> an expression starting with equal?, =, <, <=, >=, or >
-;ie) (= 10 20)
-;Returns the result of the expression
-(define (relexpr x)
-  (let ([__op (car x)]
-        [__left (cadr x)]
-        [__right (caddr x)])
-    (cond
-    ;equal? can evaluate with more than 2 arguments
-    [(equal? __op 'equal?)
-      (allEqual? (cdr x))]
-    ;All other relational operators are binary
-    ;Same process here as in aexpr above
-    [else ((hash-ref relop __op)
-      (evalRec __left)
-      (evalRec __right))])))
-
-;Helper to relexpr
-;Tests to see if all elements of a list are equal
-;x -> a list
-;Returns true if all elements in x are equal?
-(define (allEqual? x)
-  ;Recursivley checks if all elements of a list y equal a given
-  ;element e
-  (define (rec e y)
-    (cond
-    [(null? y)
-      #t]
-    [(not (equal? (evalRec e) (evalRec (car y))))
-      #f]
-    [else
-      (rec (car y) (cdr y))]))
-  ;Call the recursive function on the first element of x
-  ;and the rest of x
-  (rec (car x) (cdr x)))
-
-
-;IF ##############################################################
-
-;Rules for evaluating if expresion
-;x -> an expression starting with if
-;ie) (if (x) #t #f)
-;Returns the result of the expression
-(define (ifexpr x)
-  (let ([__cond (cadr x)]
-        [__then (caddr x)]
-        [__else (cadddr x)])
-    ;Call if with the evaluated results of the given if
-    ;expressions condition, then, and else expressions
-    (if (evalRec __cond)
-      (evalRec __then)
-      (evalRec __else))))
-
-
-;LISTS ###########################################################
-
-;Rules for evaluating list operations
-;x -> an expression starting with a list operations
-;ie) (car (2 3 4 5)), (list 2 3 4 5), etc
-;Returns the result of the expression
-(define (listexpr x)
-  (let ([__proc (car x)]  ;; Should probably do eval here instead
-        [__first (cadr x)]
-        [__all (cdr x)])
-    ;run the associated procedure on the given arguments
-    (cond
-    [(equal? 'cons __proc)
-      (cons (evalRec __first) (evalRec (caddr x)))]
-    [(equal? 'list __proc)
-      ;Return the list that results from evaluating all
-      ;arguments in the expression
-      (map evalRec __all)]
-    [(equal? 'pair? __proc)
-      (pair? (evalRec __first))]
-    [(equal? 'car __proc)
-      (car (evalRec __first))]
-    [(equal? 'cdr __proc)
-      (cdr (evalRec __first))])))
-
-
-;LAMBDA ##########################################################
-
-;Rule for a lambda expression
-;x -> a lambda expression
-;ie) (lambda (x) x)
-;Returns a proceudeure that takes a list of arguments
-(define (lambdaexpr x)
-  ;Replace all variables in the body with their values, not procedures.
-  (define body (replaceVars (cadr x) (cddr x)))
-  (checkBody (cadr x) body)  ;check for undeclared variables in body. If both replace and check were done in one call it could be return the body to __body in the let expression as that will evaluate when the lambda is created not when it is called later.
-  ;Create a procedure to execute the body of the lambdaexp
-  ;and deal with all ags and variables.
-  (lambda (args)
-    (let* ([__vars (make-hash)]
-           [__param (cadr x)]
-           [__body body])
-      ;When the procedure is called initialize all parameters
-      ;from the passed list of arguments and push the table
-      ;onto the stack
-      (for-each (lambda (k v)
-                  (hash-set! __vars k (evalRec v)))
-                __param args)
-      (push __vars)
-      ;Evaluates all the expressions in the body and return the
-      ;result.
-      (let ([res (iter evalRec __body)])
-        (pop)  ;Pop local vars off the stack
-        res))))
+;; This needs to do both the below actions and needs to work
+;; with the current variable scheme
 
 ;Recursivley Checks a list to make sure that no variables are
 ;referenced before they are initialized. This prevents one kind
@@ -358,7 +347,6 @@
       [(and (symbol? __head)
             (not (or
               (member __head args)
-              (member __head keywords)
               (var? __head))))
         (ref-error __head)]
       ;Makes sure to add the parameters of a lambda that is
@@ -398,69 +386,6 @@
         (lookup y)
         y)))
   (map rec x))
-
-;Rule for evaluating expressions that have anonymous lambdas
-;for their procedure. ie) '((lambda (x y) (+ x y)) 10 20)
-(define (funcexpr x)
-  (if (not (pair? (car x)))
-    (evalRec x)
-    (evalRec ((funcexpr (car x)) (cdr x)))))
-
-
-;LET/LETREC ######################################################
-
-;Rule for let expressions
-;x -> an expression starting with let
-;ie) (let ([x 5]) (+ x 7))
-;Returns the result of the last expression in the let body
-(define (letexpr x)
-  (let ([__vars (make-hash)]
-        [__defs (cadr x)]
-        [__body (cddr x)])
-    ;For every definition pair in the let's definition section
-    ;store the variable and evaluated value in the table
-    (for-each (lambda (y)
-                 (hash-set! __vars (car y) (evalRec (cadr y))))
-              __defs)
-    ;Push the table onto the stack after evaluating all the
-    ;values to be stored because let does not allow assignment
-    ;with variables that are being declared in it's own scope
-    (push __vars)
-    ;Evaluates all the expressions in the body and pops the
-    ;parameter table off the stack. Then returns the result
-    ;of the last evaluated expression.
-    (let ([res (iter evalRec __body)])
-      (pop)
-      res)))
-
-;Rule for letrec
-;Allows referencing uninitialized variables
-;x -> an expression starting with letrec
-;ie) (letrec ([fact (lambda (x)
-                      ;(if (= x 0)
-                          ;(quote 1)
-                          ;(* x (fact (- x 1)))))])
-                    ;(fact 10))
-;Returns the result of the last expression in the letrec body
-(define (lrecexpr x)
-  (let ([__vars (make-hash)]
-        [__defs (cadr x)]
-        [__body (cddr x)])
-    ;Initialize all variables to the table as UN_INIT and push
-    ;it to the stack. This allows for them to be referenced
-    ;in following assignment expressions. However, it still
-    ;does not allow their values to be used.
-    (for-each (lambda (y)
-                 (hash-set! __vars (car y) UN_INIT))
-              __defs)
-    (push __vars)
-    ;Evaluates all the variable definitions, but doesn't allow
-    ;variables in this scope to be used for assignments
-    (for-each letrecAsn __defs)
-    ;Same as letexpr above
-    (let ([res (iter evalRec __body)])
-      (pop)
-      res)))
 
 ;Assigns a variable and its evaluated value to the stack.
 ;Raises an error if an expression returns UN_INIT so that
