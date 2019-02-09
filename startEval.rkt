@@ -23,6 +23,50 @@
 (define UN_INIT 'uninit)
 
 
+;EVAL ############################################################
+
+;Evaluates a racket program
+;x -> a quoted racket program - ie) '(+ 3 (- 10 5))
+;Returns the result of the program
+(define (startEval x)
+  (push (builtin))
+  (my-eval x))
+
+;Recursive function to evaluate list programs
+;Calls all the functions for each kind of expression
+;depending on what type of expression x is
+;x -> a racket expression
+;Returns the result of the expression
+(define (my-eval x)
+  (cond
+  ;If x is a symbol look its value up on the stack. If it exists
+  ;return it. Otherwise lookup will raise an error.
+  [(symbol? x)
+    (lookup x)]
+  ;If x is not a pair then it should be a single data type. So
+  ;we just return this value.
+  [(not (pair? x))
+    x]
+  ;If x is a pair then it's first element should be a procedure.
+  ;If the first element is a pair, then that element is a function
+  ;that returns a procedure. So evaluate it as such.
+  [(pair? (car x))
+    (funcexpr x)]
+  ;Otherwise if first element is not a pair then it is a single
+  ;data type so look it up in the symbol table. If its value
+  ;is a procedure run it on the list of arguments. Otherwise
+  ;raise an error, because the first element of a function should
+  ;always be a procedure
+  [else
+    (let ([v (lookup (car x))])
+      (if (procedure? v)
+        (v (cdr x))
+        (raise
+          (format
+            "Error: expected a procedure\n  given: ~a"
+            (car x)))))]))
+
+
 ;BUILTINS ########################################################
 
 ;; Make this a function and have it return the list
@@ -100,50 +144,6 @@
 ;x -> the name of the variable that caused the problem
 (define (ref-error x)
   (raise (format "Error: ~a: unbound identifier" x)))
-
-
-;EVAL ############################################################
-
-;Evaluates a racket program
-;x -> a quoted racket program - ie) '(+ 3 (- 10 5))
-;Returns the result of the program
-(define (startEval x)
-  (push (builtin))
-  (my-eval x))
-
-;Recursive function to evaluate list programs
-;Calls all the functions for each kind of expression
-;depending on what type of expression x is
-;x -> a racket expression
-;Returns the result of the expression
-(define (my-eval x)
-  (cond
-  ;If x is a symbol look its value up on the stack. If it exists
-  ;return it. Otherwise lookup will raise an error.
-  [(symbol? x)
-    (lookup x)]
-  ;If x is not a pair then it should be a single data type. So
-  ;we just return this value.
-  [(not (pair? x))
-    x]
-  ;If x is a pair then it's first element should be a procedure.
-  ;If the first element is a pair, then that element is a function
-  ;that returns a procedure. So evaluate it as such.
-  [(pair? (car x))
-    (funcexpr x)]
-  ;Otherwise if first element is not a pair then it is a single
-  ;data type so look it up in the symbol table. If its value
-  ;is a procedure run it on the list of arguments. Otherwise
-  ;raise an error, because the first element of a function should
-  ;always be a procedure
-  [else
-    (let ([v (lookup (car x))])
-      (if (procedure? v)
-        (v (cdr x))
-        (raise
-          (format
-            "Error: expected a procedure\n  given: ~a"
-            (car x)))))]))
 
 
 ;SIMPLE EXPRESSIONS #############################################
