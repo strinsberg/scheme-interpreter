@@ -1,59 +1,42 @@
 #lang racket
-(provide startEval)
+(provide startEval)  ;; Make startEval available when required
 
-;NOTE all arithmetic and relational operations are binary.
-;if fewer than 2 arguments are given it will be an error, if more
-;arguments are given they will be discarded.
 
-;NOTE I have implemented checks to make sure that variables are
-;not referenced before they are assigned to. This is not
-;strictly necessary since we expect a valid racket program,
-;but it felt like a good thing for an interpreter to do. I also
-;replace any variables that have already got values. These things
-;prevent dynamic scopeing and allow for some situations where
-;lambdas return lambdas that use the outer lambdas parameters.
+;CONSTANTS ######################################################
 
-;TODO clean up all comments and make sure function documentation
-;is concise and proper.
-
-;CONSTANTS #######################################################
-
-;A value for declared but unitialized variables in letrec
+;; A value for declared but unitialized variables in letrec
 (define UN_INIT 'uninit)
 
 
-;EVAL ############################################################
+;; EVAL #########################################################
 
-;Evaluates a racket program
-;x -> a racket program
-;Returns the result of the program
+;; Evaluates a racket program
+;; x -> a racket program
+;; Returns the result of the program
 (define (startEval x)
-  (push (builtin))
+  (push (builtin))  ;; Push all predefined procedures to the stack
   (my-eval x))
 
-;Evaluates a racket expression/program
-;x -> a racket expression
-;Returns the result of the expression
+;; Evaluates a racket expression or program
+;; x -> a racket expression or program
+;; Returns the result of the evaluation
 (define (my-eval x)
   (cond
-  ;If x is a symbol look its value up on the stack. If it exists
-  ;return it. Otherwise lookup will raise an error.
+  ;; If x is a symbol return its value from the stack. Raises
+  ;; a ref-error if x is not a valid variable
   [(symbol? x)
     (lookup x)]
-  ;If x is not a pair then it should be a single data type. So
-  ;we just return this value.
+  ;If x is data just return it
   [(not (pair? x))
     x]
-  ;If x is a pair then it's first element should be a procedure.
-  ;If the first element is a pair, then that element is a function
-  ;that returns a procedure. So evaluate it as such.
+  ;; If x is a function and its procedure is also a function
+  ;; (an anonymus lambda, etc)
   [(pair? (car x))
     (func-expr x)]
-  ;Otherwise if first element is not a pair then it is a single
-  ;data type so look it up in the symbol table. If its value
-  ;is a procedure run it on the list of arguments. Otherwise
-  ;raise an error, because the first element of a function should
-  ;always be a procedure
+  ;; Else if x is a function and its first argument is a variable
+  ;; get its value from the stack. If the value is a procedure
+  ;; apply it to the functions arguments. Otherwise, raise an
+  ;; error because all functions must start with a procedure.
   [else
     (let ([v (lookup (car x))])
       (if (procedure? v)
@@ -64,10 +47,10 @@
             (car x)))))]))
 
 
-;BUILTINS ########################################################
+;; BUILTINS #####################################################
 
 ;; Returns a hash table with all builtin function names and their
-;; procedures.
+;; associated procedures.
 (define (builtin)
   (hash
     'cdr (unary-op cdr)
@@ -92,40 +75,40 @@
     'let my-let
     'letrec my-letrec))
 
-;Redefine a given unary procedure to be a procedure that takes
-;a list of arguments and uses the first one. The new procedure
-;discards any additional arguments.
-;proc -> a racket procedure
+;; Redefine a given unary procedure to be a procedure that takes
+;; a list of arguments and uses the first one. The new procedure
+;; discards any additional arguments.
+;; proc -> a racket procedure
+;; Returns the new procedure.
 (define (unary-op proc)
   (lambda (x)
     (proc (my-eval (car x)))))
 
-;Same as above but the resulting procedure uses the
-;first 2 arguments.
-;proc -> a racket procedure
+;; Same as unary-op but the resulting procedure uses the
+;; first 2 arguments.
 (define (binary-op proc)
   (lambda (x)
     (proc (my-eval (car x)) (my-eval (cadr x)))))
 
 
-;VARIABLE BINDINGS ##############################################
+;; VARIABLE BINDINGS #############################################
 
-;Stack for local variable hash tables
+;; Stack for local variable hash tables
 (define stack '())
 
-;Push a hash-table of variable value pairs onto the stack
-;x -> a hash table of variable names and their values
+;; Push a hash-table of variable value pairs onto the stack
+;; x -> a hash table of variable names and their values
 (define (push x)
   (set! stack (cons x stack)))
 
-;Pops the top off the stack
+;; Pops the top off the stack
 (define (pop)
   (set! stack (cdr stack)))
 
-;Looks for variable in the local variable list and returns the
-;value of that variable if it is found
-;Otherwise raises a error for an unbound identifier
-;v -> a variable name
+;; Looks for variable in the local variable list and returns the
+;; value of that variable if it is found
+;; Otherwise raises a error for an unbound identifier
+;; v -> a variable name
 (define (lookup v)
   (letrec ([f (lambda (x)
                 (cond
@@ -137,44 +120,41 @@
                   (f (cdr x))]))])
       (f stack)))
 
-;Raises an error for variables that are referenced before they
-;they have been declared
-;x -> the name of the variable that caused the problem
+;; Raises an error for variables that are referenced before they
+;; they have been declared
+;; x -> the name of the variable that caused the problem
 (define (ref-error x)
   (raise (format "Error: ~a: unbound identifier" x)))
 
 
 ;SIMPLE EXPRESSIONS #############################################
 
-;Rules for evaluating if expresion
-;x -> a list of arguments
-;ie) (if (x) #t #f)
-;Returns the result of applying if to the first 3 arguments
+;; Evaluates an if expresion
+;; x -> a list of arguments to an if expression
+;; Returns the result of applying if to the first 3 arguments
 (define (my-if x)
   (let ([__cond (car x)]
         [__then (cadr x)]
         [__else (caddr x)])
-    ;Call if with the evaluated results of the given if
-    ;expressions condition, then, and else expressions
     (if (my-eval __cond)
       (my-eval __then)
       (my-eval __else))))
 
-;Evaluates expressions that have expressions as their
-;procedure. Ie) anonymus lambdas or let expressions that create
-;and return procedures in their body.
-;x -> an expression with an expression as its procedure
+;; Evaluates expressions that have expressions as their
+;; procedure. Ie) anonymus lambdas or let expressions that create
+;; and return procedures in their body.
+;; x -> an expression with an expression as its procedure
 (define (func-expr x)
   (if (not (pair? (car x)))
     (my-eval x)
     (my-eval ((func-expr (car x)) (cdr x)))))
 
 
-;LAMBDA #########################################################
+;; LAMBDA ########################################################
 
-;Evaluates a lambda expression
-;x -> a lambda expression
-;Returns a proceudeure that takes a list of arguments
+;; Evaluates a lambda expression
+;; x -> a list of arguments to a lambda expression
+;; Returns a proceudeure that takes a list of arguments
 (define (my-lambda x)
   (define body (check-body (car x) (cdr x)))
   ;; Create and return the new procedure
@@ -199,7 +179,7 @@
       (pop)
       res))
 
-;VARIABLE CHECKING ##############################################
+;; VARIABLE CHECKING ############################################
 
 ;; Checks a list of expressions for valid variables.
 ;; vars -> list of valid variables that are not on the stack yet.
@@ -270,7 +250,7 @@
   (let ([__vars (make-hash)]
         [__defs (car x)]
         [__body (cdr x)])
-    ;Initialize all variables to the table as UN_INIT
+    ;; Initialize all variables to the table as UN_INIT
     (for-each (lambda (y)
                  (hash-set! __vars (car y) UN_INIT))
               __defs)
