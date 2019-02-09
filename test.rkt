@@ -38,6 +38,7 @@
 (test '(> 3 5) #f "-- Test > --")
 (test '(>= 5 3) #t "-- Test >= --")
 (test '(equal? 12 (+ 6 6) 12 12) #t "-- Test equal? --")
+(test '(equal? (quote ()) (quote ())) #t "-- Test equal? with lists --")
 
 ;Test if expressions
 (test '(if (< 3 5)

@@ -84,19 +84,9 @@
 ;x -> a list
 ;Returns true if all elements in x are equal?
 (define (my-equal? x)
-  ;Recursivley checks if all elements of a list y equal a given
-  ;element e
-  (define (rec e y)
-    (cond
-    [(null? y)
-      #t]
-    [(not (equal? (evalRec e) (evalRec (car y))))
-      #f]
-    [else
-      (rec (car y) (cdr y))]))
-  ;Call the recursive function on the first element of x
-  ;and the rest of x
-  (rec (car x) (cdr x)))
+  (andmap (lambda (y)
+            (equal? (evalRec (car x)) (evalRec y)))
+          (cdr x)))
 
 ;Rules for evaluating if expresion
 ;x -> a list of arguments
