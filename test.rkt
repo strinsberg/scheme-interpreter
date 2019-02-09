@@ -133,7 +133,7 @@
                       (quote 1)
                       (* x (fact (- x 1)))))])
                     (fact 10))
-       "-- Test letrec with a recursive lambda --")
+       "-- Test letrec with a recursive lambda (Factorial) --")
 
 ;Test let rebinding keywords
 (test '(let ([+ (lambda (x) (car x))]
@@ -199,6 +199,58 @@
                               (member? e (cdr x))]))])
               (member? 4 (list 3 6 5 2 4 6)))
       "-- Test cond with a member function --")
+
+;; Other instructor tests
+(test '(let ([inc (lambda (x) (+ x (quote 1)))])
+        (inc (quote 5)))
+      "-- Instructor Test: lambda in let with quotes --")
+
+(test '(letrec ((fib
+            (lambda (n) (if (<= n 1) 1 (+ (fib (- n 1)) (fib (- n 2)))))))
+           
+           (fib 7))
+      "-- Instructor Test: Fibonacci --")
+
+(test '(let ([sub1 (lambda (x) (- x 1))]
+                  [not (lambda (x) (if x #f #t))])
+                  
+              
+              (letrec ([is-even? (lambda (n)
+                                   (if (= n '0)
+                                       #t
+                                       (is-odd? (sub1 n))))]
+                       [is-odd? (lambda (n)
+                                  (if (not (= n '0))
+                                      (is-even? (sub1 n))
+                                      '#f
+                                      ))])
+                (is-odd? 11)))
+      "-- Instructor Test: Mutally recursive functions --")
+
+(test '(letrec ((intersect
+             (lambda (s t)
+               (if (equal? s (quote ()))
+                 (quote ())
+                 (if (member (car s) t)
+                   (cons (car s) (intersect (cdr s) t))
+                   (intersect (cdr s) t)
+                 )
+               )
+              ))
+             (member
+              (lambda (x s)
+                 (if (equal? s (quote ()))
+                   (quote #f)
+                   (if (equal? x (car s))
+                     (quote #t)
+                     (member x (cdr s))
+                   )
+                 )
+              )
+             ))
+           (intersect (quote (a b c d)) (quote (b c d e f))))
+      "-- Instructor Tests: Intersect --")
+
 
 ;Print test results
 (if (= failed 0)
