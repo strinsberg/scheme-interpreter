@@ -277,7 +277,7 @@
   (test "howards final showdown" '(let [(let (lambda (x) (cdr x))) (letrec '(1 2 3 4 5))] (let letrec)))
 
   ; (test "dynamic quote" '(letrec [(f quote)] (f (1 2 3)))) ; quote: bad syntax in: quote
-  ; (test "dynamic null?" '(letrec [(f null?)] (null? '()))) ; didn't implement null? not a requirement
+  (test "dynamic null?" '(letrec [(f null?)] (null? '())))
   (test "dynamic pair?" '(letrec [(f pair?)] (pair? '())))
   (test "dynamic car" '(letrec [(f car)] (f '(1 2 3))))
   (test "dynamic cdr" '(letrec [(f cdr)] (f '(1 2 3))))

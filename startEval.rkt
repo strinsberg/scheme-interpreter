@@ -1,12 +1,9 @@
 #lang racket
 (provide startEval)
 
-;NOTE since we are expecting a valid racket program a large
-;number of expressions that only take a certain number of
-;arguments discard extra arguments rather than complaining
-;about being given too many.
-;ie) arithmetic operations are binary so (+ 4 5 6)
-;    will return just 4 + 5 (full racket would add them all)
+;NOTE all arithmetic and relational operations are binary.
+;if fewer than 2 arguments are given it will be an error, if more
+;arguments are given they will be discarded.
 
 ;NOTE I have implemented checks to make sure that variables are
 ;not referenced before they are assigned to. This is not
@@ -16,6 +13,8 @@
 ;prevent dynamic scopeing and allow for some situations where
 ;lambdas return lambdas that use the outer lambdas parameters.
 
+;TODO clean up all comments and make sure function documentation
+;is concise and proper.
 
 ;CONSTANTS #######################################################
 
@@ -73,6 +72,7 @@
   (hash
     'cdr (unary-op cdr)
     'car (unary-op car)
+    'null? (unary-op null?)
     'pair? (unary-op pair?)
     '+ (binary-op +)
     '- (binary-op -)

@@ -30,8 +30,8 @@
 
 ;Test arithmetic operators
 (test  '(+ (- 20 5)
-                (* (/ 10 2)
-                   (+ 3 1)))
+           (* (/ 10 2)
+             (+ 3 1)))
         "-- Test arithmetic operators --")
 
 ;Test relational operators
