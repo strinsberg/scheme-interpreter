@@ -367,8 +367,11 @@
 (test '(list (map sqrt (list 1 4 9 16))
              (map (lambda (i)
                     (string-append i "!"))
-                  (list "peanuts" "popcorn" "crackerjack")))
-      "-- map --")
+                  (list "peanuts" "popcorn" "crackerjack"))
+             (andmap string? (list "a" "b" "c"))
+             (andmap string? (list "a" "b" 6))
+             (ormap number? (list "a" "b" 6)))
+      "-- map, andmap, ormap --")
 
 ;; Tests that we don't want to run every time
 (when #f #t

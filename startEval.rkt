@@ -100,8 +100,8 @@
     'reverse (unary-op reverse)
     'member (binary-op member)
     'map my-map
-    ;; 'andmap (binary-op andmap)
-    ;; 'ormap (binary-op ormap)
+    'andmap my-andmap
+    'ormap my-ormap
     
     ;; Conditional
     'if my-if
@@ -401,3 +401,29 @@
    [else
     (cons (proc (list (car x)))  ;; Don't eval because proc will
           (map-rec proc (cdr x)))]))
+
+;; An inefficent version of andmap
+;; processes list with map and then checks the list for all true
+(define (my-andmap x)
+  (letrec ([rec (lambda (x)
+                  (cond
+                   [(null? x)
+                      #t]
+                   [(not (car x))
+                      #f]
+                   [else
+                      (rec (cdr x))]))])
+    (rec (my-map x))))
+
+;; An inefficient version of ormap
+;; processes list with map and then checks the list for any true
+(define (my-ormap x)
+  (letrec ([rec (lambda (x)
+                  (cond
+                   [(null? x)
+                      #f]
+                   [(car x)
+                      #t]
+                   [else
+                      (rec (cdr x))]))])
+    (rec (my-map x))))
