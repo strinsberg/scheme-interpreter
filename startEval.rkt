@@ -7,7 +7,21 @@
 ;; the code more consise and not to seperate parts of an algorithm
 ;; with large blocks of comments.
 
-;; TODO could try to get map functions to work
+;; TODO list does not properly return a 'c as a symbol it returns
+;; it as the variable c. Racket somehow does something under
+;; the hood that I don't understand because the way it treats an
+;; evaluated 'c and a given c are different even though they
+;; look the same when printed.
+;; > (list 3 4 5 'c)
+;; '(3 4 5 c)
+;; > (map symbol? (list 3 4 5 c))
+    ; c: undefined;
+    ;  cannot reference an identifier before its definition
+    ;   in module: top-level
+    ; [,bt for context]
+;; > (map symbol? (list 3 4 5 'c))
+;; '(#f #f #f #t)  ;; my-eval will throw the above error for this
+
 
 ;CONSTANTS ######################################################
 
@@ -17,6 +31,7 @@
 ;; Some renaming for readability
 (define second cadr)
 (define third caddr)
+
 
 ;; EVAL #########################################################
 
@@ -147,6 +162,7 @@
     (proc (my-eval (car x))
           (my-eval (second x))
           (my-eval (third x)))))
+
 
 ;; VARIABLE BINDINGS #############################################
 
