@@ -22,6 +22,11 @@
 ;; > (map symbol? (list 3 4 5 'c))
 ;; '(#f #f #f #t)  ;; my-eval will throw the above error for this
 
+;; TODO test letrec to make sure that the functions don't
+;; dynamic scope with variables. Since they might be UN_INIT at
+;; the time the check-body runs in a lambda that is in a letrec
+;; definition block
+
 
 ;CONSTANTS ######################################################
 
@@ -59,9 +64,13 @@
   [(not (pair? x))
     (if (symbol? x)  ;; If it isn't a symbol skip lookup
       (let ([__val (lookup x)])
-        (if (equal? __val UNBOUND)
-          (ref-error 'my-eval x)
-          __val))
+        (cond
+        [(equal? __val UNBOUND)
+          (ref-error 'my-eval-data x)]
+        [(equal? __val UN_INIT)
+          (un-init-error x)]
+        [#t
+          __val]))
       x)]
   ;; If x is a function and its procedure is also a function
   ;; (an anonymus lambda, etc)
@@ -72,12 +81,16 @@
   ;; apply it to the functions arguments. Otherwise, raise an
   ;; error because all functions must start with a procedure.
   [else
-    (let ([v (lookup (car x))])
-      (if (procedure? v)
-        (v (cdr x))
-        (raise-argument-error 'Error
-                              "a procedure"
-                              v)))]))
+    (let ([__val (lookup (car x))])
+      (cond
+       [(equal? __val UNBOUND)
+          (ref-error 'my-eval-procedure (car x))]
+       [(procedure? __val)
+          (__val (cdr x))]
+       [else
+          (raise-argument-error 'my-eval
+                                "a procedure"
+                                 __val)]))]))
 
 
 ;; BUILTINS #####################################################
@@ -197,10 +210,17 @@
 
 ;; Raises an error for variables that are referenced before they
 ;; they have been declared
-;; x -> the name of the variable that caused the problem
+;; x -> the variable that caused the problem
 (define (ref-error loc x)
-  (raise-syntax-error loc
-                      (format "unbound identifier -> ~a" x)))
+  (raise-syntax-error x
+          (string-append "undefined;\n cannot reference "
+                        "an identifer before its definition")))
+
+;; Raises an error for UN_INIT variables
+;; x -> the variable that caused the problem
+(define (un-init-error x)
+  (raise-syntax-error x
+          "undefined;\n cannot use before initialization"))
 
 
 ;SIMPLE EXPRESSIONS #############################################
@@ -299,11 +319,15 @@
 (define (replace-var vars x)
   (if (and (symbol? x)
            (not (member? x vars)))
-      (let ([v (lookup x)])
-         (if (and (not (procedure? v))
-                  (not (equal? v UN_INIT)))
-            v
-            x))
+      (let ([__val (lookup x)])
+         (cond
+          [(equal? __val UNBOUND)
+            (ref-error 'replace-vars x)]
+          [(and (not (procedure? __val))
+                (not (equal? __val UN_INIT)))
+            __val]
+          [#t
+            x]))
         x))
 
 
@@ -341,15 +365,15 @@
 
 ;; Assigns a variable and its evaluated value to the stack.
 ;; x -> a variable value pair
-;; Raises ref-error if the value is an uninitalized variable
+;; All variables in letrec are UN_INIT up till now so if they
+;; are used in an evaluated statement before they have been
+;; assigned to my-eval will throw an error. Let rec allows them
+;; to be used in function bodies that won't be evaluated until
+;; after all variables are assigned.
 (define (lrec-assn x)
   (hash-set! (car stack)
              (car x)
-             (let ([__val (my-eval (second x))])
-               ;; Don't allow values to be uninitialized vars
-               (if (equal? UN_INIT __val)
-                 (ref-error __val)
-                 __val))))
+             (my-eval (second x))))
 
 
 ;; HELPERS ######################################################
