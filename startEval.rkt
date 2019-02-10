@@ -6,6 +6,7 @@
 ;; the code more consise and not to seperate parts of an algorithm
 ;; with large blocks of comments.
 
+;; TODO could try to get map functions to work
 
 ;CONSTANTS ######################################################
 
@@ -65,7 +66,7 @@
     '* (binary-op *)
     '/ (binary-op /)
     'sqrt (unary-op sqrt)
-    'random (unary-op random)
+    'random (unary-op random)  ;; range 0..k only
     
     ;; Comparisson
     '= (binary-op =)
@@ -88,9 +89,9 @@
     'append (binary-op append)
     'reverse (unary-op reverse)
     'member (binary-op member)
-    'map (binary-op map)
-    'andmap (binary-op andmap)
-    'ormap (binary-op ormap)
+    ;; 'map (binary-op map)
+    ;; 'andmap (binary-op andmap)
+    ;; 'ormap (binary-op ormap)
     
     ;; Conditional
     'if my-if
@@ -104,8 +105,8 @@
 
     ;; String
     'string? (unary-op string?)
-    'string-append (binary-op string-append)
-    'substring (ternary-op substring)
+    'string-append (binary-op string-append)  ;; only 2 strings
+    'substring (ternary-op substring)  ;; must always specify end
     'string-length (unary-op string-length)
     
     ;; Output
