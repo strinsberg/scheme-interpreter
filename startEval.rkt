@@ -58,28 +58,61 @@
 ;; associated procedures.
 (define (builtin)
   (hash
-    'cdr (unary-op cdr)
-    'car (unary-op car)
-    'null? (unary-op null?)  ;; extra
-    'pair? (unary-op pair?)
+    ;; Arithmetic
+    'number? (unary-op number?)
     '+ (binary-op +)
     '- (binary-op -)
     '* (binary-op *)
     '/ (binary-op /)
+    'sqrt (unary-op sqrt)
+    'random (unary-op random)
+    
+    ;; Comparisson
     '= (binary-op =)
     '<= (binary-op <=)
     '< (binary-op <)
     '>= (binary-op >=)
     '> (binary-op >)
-    'cons (binary-op cons)
     'equal? (binary-op equal?)
-    'quote (lambda (x) (quasiquote (unquote (car x))))
-    'list (lambda (x) (map my-eval x))  ;; extra
+    'not (unary-op not)
+    
+    ;; List
+    'pair? (unary-op pair?)
+    'cdr (unary-op cdr)
+    'car (unary-op car)
+    'cons (binary-op cons)
+    'list (lambda (x) (map my-eval x))
+    'null? (unary-op null?)
+    'length (unary-op length)
+    'list-ref (binary-op list-ref)
+    'append (binary-op append)
+    'reverse (unary-op reverse)
+    'member (binary-op member)
+    'map (binary-op map)
+    'andmap (binary-op andmap)
+    'ormap (binary-op ormap)
+    
+    ;; Conditional
     'if my-if
+    'cond my-cond
+    
+    ;; Other
+    'quote (lambda (x) (quasiquote (unquote (car x))))
     'lambda my-lambda
     'let my-let
     'letrec my-letrec
-    'cond my-cond  ;; extra
+
+    ;; String
+    'string? (unary-op string?)
+    'string-append (binary-op string-append)
+    'substring (ternary-op substring)
+    'string-length (unary-op string-length)
+    
+    ;; Output
+    'println (unary-op println)
+    
+    ;; Data
+    'else #t
     ))
 
 ;; Redefine a given unary procedure to be a procedure that takes
@@ -97,6 +130,12 @@
   (lambda (x)
     (proc (my-eval (car x)) (my-eval (cadr x)))))
 
+;; Same as unary-op but for procedures that take 3 arguments
+(define (ternary-op proc)
+  (lambda (x)
+    (proc (my-eval (car x))
+          (my-eval (cadr x))
+          (my-eval (caddr x)))))
 
 ;; VARIABLE BINDINGS #############################################
 
