@@ -380,12 +380,20 @@
       (map-last my-eval __body)
       (my-cond (cdr x))))]))
 
-;; Map
+;; Evaluates the arguments of a map expression
+;; x -> a list of arguments to map
+;; Returns a list of the results of calling a procedure on each
+;; element in a list
 (define (my-map x)
   (let ([__proc (car x)]
         [__list (second x)])
     (map-rec (my-eval __proc) (my-eval __list))))
 
+;; Recursive procedure for my-map.
+;; proc -> the procedure to map
+;; x    -> the list to map procedure onto
+;; Returns a list of the results of calling a proc on each
+;; element in x
 (define (map-rec proc x)
   (cond
    [(null? x)
