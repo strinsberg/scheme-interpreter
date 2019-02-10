@@ -26,7 +26,8 @@
 ;CONSTANTS ######################################################
 
 ;; A value for declared but unitialized variables in letrec
-(define UN_INIT 'uninit)
+(define UN_INIT (gensym))
+(define UNBOUND (gensym))
 
 ;; Some renaming for readability
 (define second cadr)
@@ -54,13 +55,14 @@
 ;; Returns the result of the evaluation
 (define (my-eval x)
   (cond
-  ;; If x is a symbol return its value from the stack. Raises
-  ;; a ref-error if x is not a valid variable
-  [(symbol? x)
-    (lookup x)]
-  ;If x is data just return it
+  ;If x is data return it or its bound value if it has one
   [(not (pair? x))
-    x]
+    (if (symbol? x)  ;; If it isn't a symbol skip lookup
+      (let ([__val (lookup x)])
+        (if (equal? __val UNBOUND)
+          (ref-error 'my-eval x)
+          __val))
+      x)]
   ;; If x is a function and its procedure is also a function
   ;; (an anonymus lambda, etc)
   [(pair? (car x))
@@ -180,13 +182,13 @@
 
 ;; Looks for variable in the local variable list and returns the
 ;; value of that variable if it is found
-;; Otherwise raises a error for an unbound identifier
+;; Otherwise returns UN_INIT
 ;; v -> a variable name
 (define (lookup v)
   (letrec ([f (lambda (x)
                 (cond
                 [(null? x)
-                  (ref-error v)]
+                  UNBOUND]
                 [(hash-has-key? (car x) v)
                   (hash-ref (car x) v)]
                 [else
@@ -196,8 +198,8 @@
 ;; Raises an error for variables that are referenced before they
 ;; they have been declared
 ;; x -> the name of the variable that caused the problem
-(define (ref-error x)
-  (raise-syntax-error 'Error
+(define (ref-error loc x)
+  (raise-syntax-error loc
                       (format "unbound identifier -> ~a" x)))
 
 
