@@ -19,11 +19,6 @@
           (if R (printf " (*FAIL*) ") (printf "---------> FAIL: got ~a | expected ~a\n\n\n" (~a actual) (~a expect))))
       (when R (printf "~a|\n" (~a xpr #:width 32))))))
 
-(when #f #t ; wip tests.
-  ; (test "showdown2" '(letrec [(let (lambda (x) (cdr x))) (a (+ 0 1)) (b (+ a 1)) (c (+ b 1)) (letrec '(1 (+ a 1) (+ b 1) (+ c 1) 5))] (let letrec)))
-  (test "xtra oplist" '((car                (list + - * /))    1 2)) ; 3
-  (test "xtra list procs" '(list + - * /))     ; '(#<procedure:+> #<procedure:-> #<procedure:*> #<procedure:/>)
-  )
 
 (when #t #t ; passing tests.
   (test "const"
@@ -196,7 +191,7 @@
                                     3
                                     (+ (- (/ 4 (* x (* y z))) (/ 4 (* (+ x 2) (* (+ y 2) (+ z 2))))) (Nilakantha (+ x 4) (+ y 4) (+ z 4) (- w 1))))))]
            (Nilakantha 2 3 4 10)))
-  (test "cat override" ; letrec should let me override 'cat' in this recursive call
+  (test "cat override"
         '(letrec [(cat (lambda (l)
                          (if (equal? (quote ()) l)
                              0
@@ -267,7 +262,6 @@
            (if 3 8 5)))
 
   (test "failstar" '(letrec [(l (lambda (a b) (+ a b))) (r l)] (r 1 2)))
-  ; (test "failstar" '(letrec [(r l) (l (lambda (a b) (+ a b)))] (r 1 2))) ; impossible
   (test "failstarstack" '(letrec [(l (lambda (a b) (+ a b))) (r l) (a 1) (b 1) (c 1) (d 1) (e 1) (f 1)] (r 1 2)))
   (test "stress" '(letrec [(az 10) (azw 10) (azwz 10) (awzz 10) (a (lambda (a b) (+ a b))) (z 10) (zw 10) (zwz 10) (wzz 10) (b a) (zs 10) (zws 10) (zsz 10) (c b) (zzs 10) (zwzs 10) (equal? c)] (equal? 1 2)))
   (test "superrecursive" '(letrec [(l (lambda (a b) (+ a b))) (r (lambda (a b) (+ a (l a b)))) (za 100) (zb 100) (zc 100) (zd 100) (let r) (zq 100) (zw 100) (ze 100) (zr 100)] (let 1 2)))
@@ -276,7 +270,6 @@
   
   (test "howards final showdown" '(let [(let (lambda (x) (cdr x))) (letrec '(1 2 3 4 5))] (let letrec)))
 
-  ; (test "dynamic quote" '(letrec [(f quote)] (f (1 2 3)))) ; quote: bad syntax in: quote
   (test "dynamic null?" '(letrec [(f null?)] (null? '())))
   (test "dynamic pair?" '(letrec [(f pair?)] (pair? '())))
   (test "dynamic car" '(letrec [(f car)] (f '(1 2 3))))
@@ -295,9 +288,4 @@
   (test "dynamic <" '(letrec [(f <)] (f 1 2)))
   (test "dynamic >=" '(letrec [(f >=)] (f 1 2)))
   (test "dynamic >" '(letrec [(f >)] (f 1 2)))
-
-  ;(test "dynamic if" '(letrec [(f if)] (f (#t) 2 3))) ; if: bad syntax in: if
-  ;(test "dynamic lambda" '(letrec [(f lambda)] (f () (list 1 2)))) ; lambda: bad syntax in: lambda
-  ;(test "dynamic let" '(letrec [(f let)] (f [(x 1)] x))) ; let: bad syntax  in: let
-  ;(test "dynamic letrec" '(letrec [(f letrec)] (f [(x 1)] x))) ; let: bad syntax  in: let
   )

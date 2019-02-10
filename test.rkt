@@ -93,6 +93,9 @@
             (+ x y)))
        "-- Test let with 2 levels --")
 
+(test '(let ([x 4]) 4 5 6 7 x)
+    "-- Multiple literals in a let body --")
+
 ;Test lambda
 (test '((lambda (x) x) 10)
        "-- Test lambda with just return x --")
