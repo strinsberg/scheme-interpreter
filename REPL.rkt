@@ -3,8 +3,10 @@
 
 ;; The global namespace for the REPL
 (define namespace (make-hash))
-(define UN_INIT 'uninit)
 
+;; Some constants and renaming
+(define UN_INIT 'uninit)
+(define second cadr)
 
 ;; REPL ###########################################################
 
@@ -22,7 +24,7 @@
               (my-define (cdr __input))]
            ;; Evaluate with racket interpreter instead
            [(and (pair? __input) (equal? (car __input) 'expect))
-              (printf "~a\n" (expect-eval (cadr __input)))]
+              (printf "~a\n" (expect-eval (second __input)))]
            ;; Otherwise print the result and loop
            [else
               (printf "~a\n"
@@ -52,7 +54,7 @@
     (def-func x)
     (hash-set! namespace
                (car x)
-               (repl-eval (cadr x) namespace))))
+               (repl-eval (second x) namespace))))
 
 ;; Specifically deals with defining a def expression that is
 ;; a procedure definition.

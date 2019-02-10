@@ -14,6 +14,9 @@
 ;; A value for declared but unitialized variables in letrec
 (define UN_INIT 'uninit)
 
+;; Some renaming for readability
+(define second cadr)
+(define third caddr)
 
 ;; EVAL #########################################################
 
@@ -136,14 +139,14 @@
 ;; first 2 arguments.
 (define (binary-op proc)
   (lambda (x)
-    (proc (my-eval (car x)) (my-eval (cadr x)))))
+    (proc (my-eval (car x)) (my-eval (second x)))))
 
 ;; Same as unary-op but for procedures that take 3 arguments
 (define (ternary-op proc)
   (lambda (x)
     (proc (my-eval (car x))
-          (my-eval (cadr x))
-          (my-eval (caddr x)))))
+          (my-eval (second x))
+          (my-eval (third x)))))
 
 ;; VARIABLE BINDINGS #############################################
 
@@ -189,8 +192,8 @@
 ;; Returns the result of applying if to the first 3 arguments
 (define (my-if x)
   (let ([__cond (car x)]
-        [__then (cadr x)]
-        [__else (caddr x)])
+        [__then (second x)]
+        [__else (third x)])
     (if (my-eval __cond)
       (my-eval __then)
       (my-eval __else))))
@@ -257,10 +260,10 @@
           [__args (cdr x)])
       (cond
       [(equal? 'lambda __proc)
-        (check-vars (append (cadr x) vars) x)]
+        (check-vars (append (second x) vars) x)]
       [(or (equal? 'let __proc)
            (equal? 'letrec __proc))
-        (check-vars (append (map car (cadr x)) vars) x)]
+        (check-vars (append (map car (second x)) vars) x)]
       [else
         (check-vars vars x)]))
     (replace-var vars x)))
@@ -298,7 +301,7 @@
         [__body (cdr x)])
     ;; Initalize all variable value pairs and push onto the stack
     (for-each (lambda (y)
-                 (hash-set! __vars (car y) (my-eval (cadr y))))
+                 (hash-set! __vars (car y) (my-eval (second y))))
               __defs)
     (push __vars)
     (eval-body __body)))
@@ -324,7 +327,7 @@
 (define (lrec-assn x)
   (hash-set! (car stack)
              (car x)
-             (let ([__val (my-eval (cadr x))])
+             (let ([__val (my-eval (second x))])
                ;; Don't allow values to be uninitialized vars
                (if (equal? UN_INIT __val)
                  (ref-error __val)
