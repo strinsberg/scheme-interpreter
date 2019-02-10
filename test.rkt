@@ -373,7 +373,17 @@
              (ormap number? (list "a" "b" 6)))
       "-- map, andmap, ormap --")
 
-;; Tests that we don't want to run every time
+;; The returns from list are the same, but if my eval processes
+;; the list that is returned it will think the first c is a
+;; variable and not a symbol
+;; See tests below in fails section
+(test '(let ([c 6])
+          (list (list "3" 4 'c)
+                (list 4 "5" c)))
+      "-- list with symbols and variables --")
+
+
+;; Tests that we don't want to run every time ###################
 (when #f #t
 
 ;; println
@@ -389,17 +399,16 @@
            [else "cat's game"]))
      "-- Test random and let with cond --\n-- Will fail often as the result rely on random --")
 
-;; Map fails because the procedure that it gets takes a list
-;; of arguments rather than the one it expects
-;; BREAKS FLOW
-(test '(list (map sqrt (list 1 4 9 16))
-             (map (lambda (i)
-                    (string-append i "!"))
-                  (list "peanuts" "popcorn" "crackerjack"))
-             (andmap string? (list "a" "b" "c"))
-             (andmap string? (list "a" "b" 6))
-             (ormap number? (list "a" "b" 6)))
-      "-- map, andmap, ormap --")
+;; Fails because my program reads the c in the created list as
+;; a variable and racket reads it as a symbol still
+(test '(let ([c 6])
+          (map number? (list "3" 4 'c)))
+      "-- pass list with symbol that is declared variable --")
+
+;; throws because mine reads c as avariable once list returns it
+;; so it finds an unbound identifier
+(test '(map number? (list "3" 4 'c))
+      "-- pass list with symbol that is undeclared as a variable--")
 )
 
 
