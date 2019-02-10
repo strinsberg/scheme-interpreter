@@ -99,7 +99,7 @@
     'append (binary-op append)
     'reverse (unary-op reverse)
     'member (binary-op member)
-    ;; 'map (binary-op map)
+    'map my-map
     ;; 'andmap (binary-op andmap)
     ;; 'ormap (binary-op ormap)
     
@@ -379,3 +379,17 @@
     (if (my-eval __cond)
       (map-last my-eval __body)
       (my-cond (cdr x))))]))
+
+;; Map
+(define (my-map x)
+  (let ([__proc (car x)]
+        [__list (second x)])
+    (map-rec (my-eval __proc) (my-eval __list))))
+
+(define (map-rec proc x)
+  (cond
+   [(null? x)
+      (quote ())]
+   [else
+    (cons (proc (list (car x)))  ;; Don't eval because proc will
+          (map-rec proc (cdr x)))]))

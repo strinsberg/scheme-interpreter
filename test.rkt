@@ -364,6 +364,12 @@
             (remove-dups (list "a" "b" "b" "b" "c" "c")))
       "-- remove-dups --")
 
+(test '(list (map sqrt (list 1 4 9 16))
+             (map (lambda (i)
+                    (string-append i "!"))
+                  (list "peanuts" "popcorn" "crackerjack")))
+      "-- map --")
+
 ;; Tests that we don't want to run every time
 (when #f #t
 

@@ -8,28 +8,25 @@
 (define UN_INIT 'uninit)
 (define second cadr)
 
-;; REPL ###########################################################
+
+;; REPL ########################################################
 
 ;; Run the REPL. Reads input from the user and prints the
 ;; evaluated result
 (define (repl)
-  (let ([__input (get-input)])  ;; Prompt and read input
+  (let ([__input (get-input)])      ;; Prompt and read input
     (if (or (equal? __input 'exit)  ;; Break if exit is entered
             (eof-object? __input))
         #f
         (begin
           (cond
-           ;; Define a global function or variable
-           [(and (pair? __input) (equal? (car __input) 'def))
-              (my-define (cdr __input))]
-           ;; Evaluate with racket interpreter instead
-           [(and (pair? __input) (equal? (car __input) 'expect))
-              (printf "~a\n" (expect-eval (second __input)))]
-           ;; Otherwise print the result and loop
+           ;; If input is an repl procedure execute it
+           [(repl-proc? __input)
+              (execute (car __input) (cdr __input))]
+           ;; Otherwise evaluate and print result
            [else
-              (printf "~a\n"
-                      (repl-eval __input namespace))])
-            (repl)))))
+              (println (repl-eval __input namespace))])
+          (repl)))))
 
 ;; Get input from the usee. Displays a prompt and reads all text
 ;; when return is pressed.
@@ -42,6 +39,31 @@
 (define expect-eval
   (let [(ns (make-base-namespace))]
     (lambda (expr) (eval expr ns))))
+
+
+;; REPL PROCEDURES #############################################
+
+;; Checks input to see if it is an repl specific procedure
+(define (repl-proc? input)
+  (and (pair? input)
+       (hash-has-key? global-procs (car input))))
+
+;; Runs an named repl procedure on a list of its arguments
+(define (execute name args)
+      ((hash-ref global-procs name) args))
+
+;; Runs the racket interpreter on an expression/program
+;; If for some reason more than one program is given this
+;; will only run the first one.
+(define (expect args)
+  (println (expect-eval (car args))))
+
+;; Return a hash table of the names and procedures for all global
+;; repl procedures
+(define (make-global-procs)
+    (hash
+        'define my-define
+        'expect expect))
 
 
 ;; DEFINE ######################################################
@@ -74,8 +96,10 @@
                          namespace))))
 
 
-;; Start REPL #####################################################
+;; START REPL ###################################################
 
+;; Runs the REPL with exception handling so that it doesn't
+;; crash when you make a mistake.
 (define (run)
   (with-handlers ([exn?
                       (lambda (exn)
@@ -83,5 +107,11 @@
                         (run))])
     (repl)))
 
+;; Set up REPL specific procedures
+(define global-procs (make-global-procs))
+
+;; Display opening message
 (display "-- Welcome To My Racket REPL 1.0 --\n")
+
+;; Start the REPL
 (run)
