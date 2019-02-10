@@ -55,10 +55,9 @@
     (let ([v (lookup (car x))])
       (if (procedure? v)
         (v (cdr x))
-        (raise
-          (format
-            "Error: expected a procedure\n  given: ~a"
-            (car x)))))]))
+        (raise-argument-error 'Error
+                              "a procedure"
+                              v)))]))
 
 
 ;; BUILTINS #####################################################
@@ -179,7 +178,8 @@
 ;; they have been declared
 ;; x -> the name of the variable that caused the problem
 (define (ref-error x)
-  (raise (format "Error: ~a: unbound identifier" x)))
+  (raise-syntax-error 'Error
+                      (format "unbound identifier -> ~a" x)))
 
 
 ;SIMPLE EXPRESSIONS #############################################

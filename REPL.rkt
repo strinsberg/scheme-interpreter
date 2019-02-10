@@ -3,6 +3,7 @@
 
 ;; The global namespace for the REPL
 (define namespace (make-hash))
+(define UN_INIT 'uninit)
 
 
 ;; REPL ###########################################################
@@ -14,23 +15,31 @@
     (if (or (equal? __input 'exit)  ;; Break if exit is entered
             (eof-object? __input))
         #f
-        (cond
-         ;; If def is used store the result in the global ns
-         [(and (pair? __input)
-               (equal? (car __input) 'def))
-            (my-define (cdr __input))
-            (repl)]
-         ;; Otherwise print the result and loop
-         [else
-            (printf "~a\n"
-                    (repl-eval __input namespace))
-            (repl)]))))
+        (begin
+          (cond
+           ;; Define a global function or variable
+           [(and (pair? __input) (equal? (car __input) 'def))
+              (my-define (cdr __input))]
+           ;; Evaluate with racket interpreter instead
+           [(and (pair? __input) (equal? (car __input) 'expect))
+              (printf "~a\n" (expect-eval (cadr __input)))]
+           ;; Otherwise print the result and loop
+           [else
+              (printf "~a\n"
+                      (repl-eval __input namespace))])
+            (repl)))))
 
 ;; Get input from the usee. Displays a prompt and reads all text
 ;; when return is pressed.
 (define (get-input)
   (display ">> ")
-  (read))
+  (with-handlers ([exn? (lambda (x) (exn-message x))])
+          (read)))
+
+;; Evaluate an expression with the racket interpreter
+(define expect-eval
+  (let [(ns (make-base-namespace))]
+    (lambda (expr) (eval expr ns))))
 
 
 ;; DEFINE ######################################################
@@ -38,6 +47,7 @@
 ;; Puts the name and value of a def expression into the global ns
 ;; x -> the arguments to a def expression
 (define (my-define x)
+  (hash-set! namespace (car x) UN_INIT)
   (if (pair? (car x))
     (def-func x)
     (hash-set! namespace
@@ -63,5 +73,13 @@
 
 
 ;; Start REPL #####################################################
+
+(define (run)
+  (with-handlers ([exn?
+                      (lambda (exn)
+                        (printf "~a\n" (exn-message exn))
+                        (run))])
+    (repl)))
+
 (display "-- Welcome To My Racket REPL 1.0 --\n")
-(repl)
+(run)
