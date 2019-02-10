@@ -1,5 +1,6 @@
 #lang racket
 (provide startEval)  ;; Make startEval available when required
+(provide repl-eval)  ;; Make this available for REPL use
 
 ;; NOTE all non-trivial functions and algorithms are
 ;; more fully documented in the report. This is done to keep
@@ -21,6 +22,13 @@
 ;; Returns the result of the program
 (define (startEval x)
   (push (builtin))  ;; Push all predefined procedures to the stack
+  (my-eval x))
+
+;; Another start to the program, but for use with an REPL that
+;; has it's own namespace to pass in
+(define (repl-eval x ns)
+  (push (builtin))
+  (push ns)
   (my-eval x))
 
 ;; Evaluates a racket expression or program
