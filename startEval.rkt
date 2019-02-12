@@ -22,11 +22,8 @@
 ;; > (map symbol? (list 3 4 5 'c))
 ;; '(#f #f #f #t)  ;; my-eval will throw the above error for this
 
-;; TODO test letrec to make sure that the functions don't
-;; dynamic scope with variables. Since they might be UN_INIT at
-;; the time the check-body runs in a lambda that is in a letrec
-;; definition block
-
+;; TODO can have a function that takes arguments and returns a
+;; lambda for for-each in let and letrec
 
 ;CONSTANTS ######################################################
 
@@ -75,7 +72,7 @@
   ;; If x is a function and its procedure is also a function
   ;; (an anonymus lambda, etc)
   [(pair? (car x))
-    (func-expr x)]
+    ((my-eval (car x)) (cdr x))]
   ;; Else if x is a function and its first argument is a variable
   ;; get its value from the stack. If the value is a procedure
   ;; apply it to the functions arguments. Otherwise, raise an
@@ -236,15 +233,6 @@
       (my-eval __then)
       (my-eval __else))))
 
-;; Evaluates expressions that have expressions as their
-;; procedure. Ie) anonymus lambdas or let expressions that create
-;; and return procedures in their body.
-;; x -> an expression with an expression as its procedure
-(define (func-expr x)
-  (if (not (pair? (car x)))
-    (my-eval x)
-    (my-eval ((func-expr (car x)) (cdr x)))))
-
 
 ;; LAMBDA ########################################################
 ;; See report for additional documentation
@@ -365,11 +353,6 @@
 
 ;; Assigns a variable and its evaluated value to the stack.
 ;; x -> a variable value pair
-;; All variables in letrec are UN_INIT up till now so if they
-;; are used in an evaluated statement before they have been
-;; assigned to my-eval will throw an error. Let rec allows them
-;; to be used in function bodies that won't be evaluated until
-;; after all variables are assigned.
 (define (lrec-assn x)
   (hash-set! (car stack)
              (car x)
