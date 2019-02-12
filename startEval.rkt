@@ -22,8 +22,14 @@
 ;; > (map symbol? (list 3 4 5 'c))
 ;; '(#f #f #f #t)  ;; my-eval will throw the above error for this
 
-;; TODO can have a function that takes arguments and returns a
-;; lambda for for-each in let and letrec
+;; TODO lambda let and letrec all have very similar code, if it
+;; is possible you could try to extract it to a function or two
+;; TODO think about how you would go about passing the namespace
+;; around rather than using a mutable hash. Pass the list to
+;; all calls to my-eval. When putting things onto it,
+;; (cons vars onto it). no need to pop anything because every
+;; scope has it's own copy of the variables it need. still need
+;; to replace function stuff if needed or it will be lost
 
 ;CONSTANTS ######################################################
 
@@ -73,6 +79,8 @@
   ;; (an anonymus lambda, etc)
   [(pair? (car x))
     ((my-eval (car x)) (cdr x))]
+  [(procedure? (car x))
+    ((car x) (cdr x))]
   ;; Else if x is a function and its first argument is a variable
   ;; get its value from the stack. If the value is a procedure
   ;; apply it to the functions arguments. Otherwise, raise an
@@ -311,8 +319,7 @@
          (cond
           [(equal? __val UNBOUND)
             (ref-error 'replace-vars x)]
-          [(and (not (procedure? __val))
-                (not (equal? __val UN_INIT)))
+          [(not (equal? __val UN_INIT))
             __val]
           [#t
             x]))

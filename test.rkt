@@ -160,6 +160,14 @@
         10 20)
        "-- Test lambda with let in body --")
 
+(test '(let ([a (lambda (f y) (f y))]) (a null? '()))
+    "-- test let with function passing --")
+
+(test '((let ([a (lambda (f y) (f y))]) a) null? '())
+    "-- test let with lambda that returns the procedure that takes a function --")
+
+(test '((let ([a (lambda (f y) (f y))]) (lambda (x) (a x '()))) null?)
+    "-- test let that returns a function that uses a local function in its body --")
 
 ;; Assignment questions ########################################
 
