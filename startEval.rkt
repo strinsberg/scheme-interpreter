@@ -28,8 +28,7 @@
 ;; around rather than using a mutable hash. Pass the list to
 ;; all calls to my-eval. When putting things onto it,
 ;; (cons vars onto it). no need to pop anything because every
-;; scope has it's own copy of the variables it need. still need
-;; to replace function stuff if needed or it will be lost
+;; scope has it's own copy of the variables it need.
 
 ;CONSTANTS ######################################################
 
@@ -75,24 +74,24 @@
         [#t
           __val]))
       x)]
-  ;; If x is a function and its procedure is also a function
+  ;; x is a function and its procedure is also a function
   ;; (an anonymus lambda, etc)
   [(pair? (car x))
     ((my-eval (car x)) (cdr x))]
+  ;; First element of x is an actual procedure then just call
+  ;; it on a list of its arguments. This really only applies to
+  ;; things that are saved in function calls for later use.
   [(procedure? (car x))
     ((car x) (cdr x))]
-  ;; Else if x is a function and its first argument is a variable
-  ;; get its value from the stack. If the value is a procedure
-  ;; apply it to the functions arguments. Otherwise, raise an
-  ;; error because all functions must start with a procedure.
+  ;; Else x is a function and (car x) is a variable.
   [else
-    (let ([__val (lookup (car x))])
+    (let ([__val (lookup (car x))])  ;; get variables value
       (cond
-       [(equal? __val UNBOUND)
+       [(equal? __val UNBOUND)  ;; variable is unbound
           (ref-error 'my-eval-procedure (car x))]
-       [(procedure? __val)
+       [(procedure? __val)  ;; variable is a proceduer
           (__val (cdr x))]
-       [else
+       [else  ;; first element of function is not a procedure
           (raise-argument-error 'my-eval
                                 "a procedure"
                                  __val)]))]))
@@ -358,12 +357,13 @@
     (for-each lrec-assn __defs)
     (eval-body __body)))
 
-;; Assigns a variable and its evaluated value to the stack.
+;; Assigns a variable and its evaluated value to the first level
+;; of the stack. In letrec all variables are on the first level
+;; they are just uninitialized so they can be refered to, but not
+;; used in the assignment section.
 ;; x -> a variable value pair
 (define (lrec-assn x)
-  (hash-set! (car stack)
-             (car x)
-             (my-eval (second x))))
+  (hash-set! (car stack) (car x) (my-eval (second x))))
 
 
 ;; HELPERS ######################################################
