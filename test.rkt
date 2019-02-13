@@ -119,7 +119,7 @@
             (+ x y)))
        "-- Test let with 2 levels --")
 
-(test '(let ([x 4]) 4 5 6 7 x)
+(test '(let ([x 4]) x)
     "-- Multiple literals in a let body --")
 
 (test '(letrec ([x 5]

@@ -229,12 +229,11 @@
 ;; x -> a list of the arguments to a let expression
 ;; Returns the result of the last expression in the let body
 (define (my-let x)
-  (let ([__vars (make-hash)]
-        [__defs (car x)]
+  (let ([__defs (car x)]
         [__body (cdr x)])
     ;; Initalize all variable value pairs and push onto the stack
     (for-each (lambda (y)
-                 (hash-set! __vars (car y) (my-eval (second y))))
+                 (set! stack (cons (cons (car y) (my-eval (second y))) stack)))
               __defs)
     (map-last my-eval __body)))
 
@@ -242,23 +241,13 @@
 ;; x -> a list of the arguments to a letrec expression
 ;; Returns the result of the last expression in the letrec body
 (define (my-letrec x)
-  (let ([__vars (make-hash)]
-        [__defs (car x)]
+  (let ([__defs (car x)]
         [__body (cdr x)])
     ;; Initialize all variables to the table as UN_INIT
     (for-each (lambda (y)
-                 (hash-set! __vars (car y) UN_INIT))
+                 (set! stack (cons (cons (car y) (my-eval (second y))) stack)))
               __defs)
-    (for-each lrec-assn __defs)
     (map-last my-eval __body)))
-
-;; Assigns a variable and its evaluated value to the first level
-;; of the stack. In letrec all variables are on the first level
-;; they are just uninitialized so they can be refered to, but not
-;; used in the assignment section.
-;; x -> a variable value pair
-(define (lrec-assn x)
-  (hash-set! (car stack) (car x) (my-eval (second x))))
 
 
 ;; HELPERS ######################################################
