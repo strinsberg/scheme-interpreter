@@ -1,6 +1,6 @@
 #lang racket
 (provide startEval)  ;; Make startEval available when required
-(provide repl-eval)  ;; Make this available for REPL use
+;(provide repl-eval)  ;; Make this available for REPL use
 
 ;; NOTE all non-trivial functions and algorithms are
 ;; more fully documented in the report. This is done to keep
@@ -47,14 +47,7 @@
 ;; x -> a racket program
 ;; Returns the result of the program
 (define (startEval x)
-  (push (builtin))  ;; Push all predefined procedures to the stack
-  (my-eval x))
-
-;; Another start to the program, but for use with an REPL that
-;; has it's own namespace to pass in
-(define (repl-eval x ns)
-  (push (builtin))
-  (push ns)
+  (set! stack (builtin))  ;; Push all predefined procedures to the stack
   (my-eval x))
 
 ;; Evaluates a racket expression or program
@@ -102,35 +95,35 @@
 ;; Returns a hash table with all builtin function names and their
 ;; associated procedures.
 (define (builtin)
-  (hash
+  (list
     ;; Arithmetic
-    '+ (binary-op +)
-    '- (binary-op -)
-    '* (binary-op *)
-    '/ (binary-op /)
+    (cons '+ (binary-op +))
+    (cons '- (binary-op -))
+    (cons '* (binary-op *))
+    (cons '/ (binary-op /))
     
     ;; Comparisson
-    '= (binary-op =)
-    '<= (binary-op <=)
-    '< (binary-op <)
-    '>= (binary-op >=)
-    '> (binary-op >)
-    'equal? (binary-op equal?)
+    (cons '= (binary-op =))
+    (cons '<= (binary-op <=))
+    (cons '< (binary-op <))
+    (cons '>= (binary-op >=))
+    (cons '> (binary-op >))
+    (cons 'equal? (binary-op equal?))
     
     ;; List
-    'pair? (unary-op pair?)
-    'cdr (unary-op cdr)
-    'car (unary-op car)
-    'cons (binary-op cons)
+    (cons 'pair? (unary-op pair?))
+    (cons 'cdr (unary-op cdr))
+    (cons 'car (unary-op car))
+    (cons 'cons (binary-op cons))
     
     ;; Conditional
-    'if my-if
+    (cons 'if my-if)
     
     ;; Other
-    'quote (lambda (x) (quasiquote (unquote (car x))))
-    'lambda my-lambda
-    'let my-let
-    'letrec my-letrec
+    (cons 'quote (lambda (x) (quasiquote (unquote (car x)))))
+    (cons 'lambda my-lambda)
+    (cons 'let my-let)
+    (cons 'letrec my-letrec)
     ))
 
 ;; Redefine a given unary procedure to be a procedure that takes
@@ -161,26 +154,22 @@
 ;; Stack for local variable hash tables
 (define stack '())
 
-;; Push a hash-table of variable value pairs onto the stack
-;; x -> a hash table of variable names and their values
-(define (push x)
-  (set! stack (cons x stack)))
+;; Add a list of variables x to a stack and return the new stack
+(define (add-vars x stack)
+  (cond
+   [(null? x)
+      stack]
+   [else
+      (add-vars (cdr x) stack)]))
 
-;; Pops the top off the stack
-(define (pop)
-  (set! stack (cdr stack)))
-
-;; Looks for variable in the local variable list and returns the
-;; value of that variable if it is found
-;; Otherwise returns UN_INIT
-;; v -> a variable name
+;; Looks for variable in the stack
 (define (lookup v)
   (letrec ([f (lambda (x)
                 (cond
                 [(null? x)
                   UNBOUND]
-                [(hash-has-key? (car x) v)
-                  (hash-ref (car x) v)]
+                [(equal? (car (car x)) v)
+                  (cdr (car x))]
                 [else
                   (f (cdr x))]))])
       (f stack)))
@@ -223,26 +212,15 @@
 (define (my-lambda x)
   ;; Create and return the new procedure
   (lambda (args)
-    (let* ([__vars (make-hash)]
-           [__param (car x)]
+    (let* ([__param (car x)]
            [__body (cdr x)])
       ;; Initialize all variables from the list of arguments
       ;; and push them onto the stack
       (for-each (lambda (k v)
-                  (hash-set! __vars k (my-eval v)))
+                  (set! stack (cons (cons k (my-eval v)) stack)))
                 __param args)
-      (push __vars)
-      (eval-body __body))))
+      (map-last my-eval __body))))
 
-;; Evaluate all expressions in the body of a lambda, let, or
-;; letrec and return the result of the last one evaluated
-;; after poping the local variables of the stack.
-;; x -> a list of exxpressions
-(define (eval-body x)
-  (let ([res (map-last my-eval x)])
-      (pop)
-      res))
-      
 
 ;LET/LETREC #####################################################
 ;; See report for additional documentation
@@ -258,8 +236,7 @@
     (for-each (lambda (y)
                  (hash-set! __vars (car y) (my-eval (second y))))
               __defs)
-    (push __vars)
-    (eval-body __body)))
+    (map-last my-eval __body)))
 
 ;; Evaluates letrec expressions
 ;; x -> a list of the arguments to a letrec expression
@@ -272,9 +249,8 @@
     (for-each (lambda (y)
                  (hash-set! __vars (car y) UN_INIT))
               __defs)
-    (push __vars)
     (for-each lrec-assn __defs)
-    (eval-body __body)))
+    (map-last my-eval __body)))
 
 ;; Assigns a variable and its evaluated value to the first level
 ;; of the stack. In letrec all variables are on the first level
