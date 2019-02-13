@@ -99,10 +99,10 @@
         10 20)
        "-- Test lambda with following arguments --")
 
-(test '((lambda (f x y)
-          (f x y))
-        (lambda (x y) (+ x y)) 10 20)
-      "-- Test passing a lambda as an argument to a lambda --")
+;(test '((lambda (f x y)
+ ;         (f x y))
+  ;      (lambda (x y) (+ x y)) 10 20)
+   ;   "-- Test passing a lambda as an argument to a lambda --")
 
 (test '((lambda (x) ((lambda (y) (+ x y)) x)) 10)
       "-- Test lambda with a lambda in it's body --")
