@@ -104,13 +104,10 @@
 (define (builtin)
   (hash
     ;; Arithmetic
-    'number? (unary-op number?)
     '+ (binary-op +)
     '- (binary-op -)
     '* (binary-op *)
     '/ (binary-op /)
-    'sqrt (unary-op sqrt)
-    'random (unary-op random)  ;; range 0..k only
     
     ;; Comparisson
     '= (binary-op =)
@@ -119,45 +116,21 @@
     '>= (binary-op >=)
     '> (binary-op >)
     'equal? (binary-op equal?)
-    'not (unary-op not)
     
     ;; List
     'pair? (unary-op pair?)
     'cdr (unary-op cdr)
     'car (unary-op car)
     'cons (binary-op cons)
-    'list (lambda (x) (map my-eval x))
-    'null? (unary-op null?)
-    'length (unary-op length)
-    'list-ref (binary-op list-ref)
-    'append (binary-op append)
-    'reverse (unary-op reverse)
-    'member (binary-op member)
-    'map my-map
-    'andmap my-andmap
-    'ormap my-ormap
     
     ;; Conditional
     'if my-if
-    'cond my-cond
     
     ;; Other
     'quote (lambda (x) (quasiquote (unquote (car x))))
     'lambda my-lambda
     'let my-let
     'letrec my-letrec
-
-    ;; String
-    'string? (unary-op string?)
-    'string-append (binary-op string-append)  ;; only 2 strings
-    'substring (ternary-op substring)  ;; must always specify end
-    'string-length (unary-op string-length)
-    
-    ;; Output
-    'println (unary-op println)
-    
-    ;; Data
-    'else #t
     ))
 
 ;; Redefine a given unary procedure to be a procedure that takes
@@ -248,12 +221,11 @@
 ;; x -> a list of arguments to a lambda expression
 ;; Returns a proceudeure that takes a list of arguments
 (define (my-lambda x)
-  (define body (check-body (car x) (cdr x)))
   ;; Create and return the new procedure
   (lambda (args)
     (let* ([__vars (make-hash)]
            [__param (car x)]
-           [__body body])
+           [__body (cdr x)])
       ;; Initialize all variables from the list of arguments
       ;; and push them onto the stack
       (for-each (lambda (k v)
@@ -270,60 +242,7 @@
   (let ([res (map-last my-eval x)])
       (pop)
       res))
-
-
-;; VARIABLE CHECKING ############################################
-;; See report for additional documentation
-
-;; Checks a list of expressions for valid variables.
-;; vars -> list of valid variables that are not on the stack yet.
-;; x    -> a token or an expression
-;; Returns the list with any replacements
-;; Raises a ref-error if any variables are not in vars
-;; or on the stack
-(define (check-body vars x)
-  (map (lambda (y)
-         (check-expr vars y))
-       x))
-
-;; Checks an expression for valid variables.
-(define (check-expr vars x)
-  (if (pair? x)
-    (let ([__proc (car x)]
-          [__args (cdr x)])
-      (cond
-      [(equal? 'lambda __proc)
-        (check-vars (append (second x) vars) x)]
-      [(or (equal? 'let __proc)
-           (equal? 'letrec __proc))
-        (check-vars (append (map car (second x)) vars) x)]
-      [else
-        (check-vars vars x)]))
-    (replace-var vars x)))
-
-;; Checks the variables of an expression.
-(define (check-vars vars x)
-  (define (rec y)
-    (if (list? y)
-      (check-expr vars y)
-      (replace-var vars y)))
-  (map rec x))
-
-;; Returns a variables value if possible, otherwise
-;; returns the variable
-(define (replace-var vars x)
-  (if (and (symbol? x)
-           (not (member? x vars)))
-      (let ([__val (lookup x)])
-         (cond
-          [(equal? __val UNBOUND)
-            (ref-error 'replace-vars x)]
-          [(not (equal? __val UN_INIT))
-            __val]
-          [#t
-            x]))
-        x))
-
+      
 
 ;LET/LETREC #####################################################
 ;; See report for additional documentation
@@ -392,70 +311,3 @@
     #t]
   [else
     (member? e (cdr x))]))
-
-
-;; EXTRA #########################################################
-;; Anything here is extra to the project description
-;; I just added it out of interest and for fun
-
-;; Evaluates the arguments to a cond expression
-;; x -> a list of arguments to a cond expresion
-;; Returns the result of the body of the evaluated conditional
-;; or void if none of the conditionals are true
-(define (my-cond x)
-  (cond
-  [(not (null? x))
-    (let* ([__stmt (car x)]
-           [__cond (car __stmt)]
-           [__body (cdr __stmt)])
-    (if (my-eval __cond)
-      (map-last my-eval __body)
-      (my-cond (cdr x))))]))
-
-;; Evaluates the arguments of a map expression
-;; x -> a list of arguments to map
-;; Returns a list of the results of calling a procedure on each
-;; element in a list
-(define (my-map x)
-  (let ([__proc (car x)]
-        [__list (second x)])
-    (map-rec (my-eval __proc) (my-eval __list))))
-
-;; Recursive procedure for my-map.
-;; proc -> the procedure to map
-;; x    -> the list to map procedure onto
-;; Returns a list of the results of calling a proc on each
-;; element in x
-(define (map-rec proc x)
-  (cond
-   [(null? x)
-      (quote ())]
-   [else
-    (cons (proc (list (car x)))  ;; Don't eval because proc will
-          (map-rec proc (cdr x)))]))
-
-;; An inefficent version of andmap
-;; processes list with map and then checks the list for all true
-(define (my-andmap x)
-  (letrec ([rec (lambda (x)
-                  (cond
-                   [(null? x)
-                      #t]
-                   [(not (car x))
-                      #f]
-                   [else
-                      (rec (cdr x))]))])
-    (rec (my-map x))))
-
-;; An inefficient version of ormap
-;; processes list with map and then checks the list for any true
-(define (my-ormap x)
-  (letrec ([rec (lambda (x)
-                  (cond
-                   [(null? x)
-                      #f]
-                   [(car x)
-                      #t]
-                   [else
-                      (rec (cdr x))]))])
-    (rec (my-map x))))
