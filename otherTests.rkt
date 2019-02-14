@@ -147,11 +147,11 @@
            (fact 10)))
   (test "sum of list"
         '(letrec [(listsum (lambda (x) (if (pair? x) (+ (car x) (listsum (cdr x))) 0)))]
-           (listsum (list 1 2))))
+           (listsum (quote (1 2)))))
   (test "let return list"
-        '(let [(f (lambda (x) x))] (f (list 1 2))))
+        '(let [(f (lambda (x) x))] (f (quote (1 2)))))
   (test "letrec return list"
-        '(letrec [(f (lambda (x) x))] (f (list 1 2))))
+        '(letrec [(f (lambda (x) x))] (f (quote (1 2)))))
   (test "max of list"
         '(letrec [(max (lambda (x)
                          (if (pair? (cdr x))
@@ -206,7 +206,7 @@
   
   (test "varlist"
         '(letrec [(f (lambda (x) x))]
-           (f (list 1 2))))
+           (f (quote (1 2)))))
 
   (test "varlistrec"
         '(letrec [(f (lambda (x) x))]

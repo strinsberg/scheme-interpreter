@@ -33,7 +33,6 @@
 ;CONSTANTS ######################################################
 
 ;; A value for declared but unitialized variables in letrec
-(define UN_INIT (gensym))
 (define UNBOUND (gensym))
 
 ;; Some renaming for readability
@@ -47,8 +46,7 @@
 ;; x -> a racket program
 ;; Returns the result of the program
 (define (startEval x)
-  (set! stack (builtin))  ;; Push all predefined procedures to the stack
-  (my-eval x stack))
+  (my-eval x (builtin)))
 
 ;; Evaluates a racket expression or program
 ;; x -> a racket expression or program
@@ -62,8 +60,6 @@
         (cond
         [(equal? __val UNBOUND)
           (ref-error 'my-eval-data x)]
-        [(equal? __val UN_INIT)
-          (un-init-error x)]
         [#t
           __val]))
       x)]
@@ -86,9 +82,11 @@
           (__val (cdr x) stack)]
        [(pair? __val)
           ((my-eval __val stack) (cdr x) stack)]
+       [(symbol? __val)
+          ((my-eval (lookup __val stack) stack) (cdr x) stack)]
        [else  ;; first element of function is not a procedure
           (raise-argument-error 'my-eval
-                                "a procedure"
+                                "a procedure***"
                                  __val)]))]))
 
 
@@ -111,12 +109,14 @@
     (list '>= (binary-op >=))
     (list '> (binary-op >))
     (list 'equal? (binary-op equal?))
+    (list 'null? (unary-op null?))
     
     ;; List
     (list 'pair? (unary-op pair?))
     (list 'cdr (unary-op cdr))
     (list 'car (unary-op car))
     (list 'cons (binary-op cons))
+    (list 'list (lambda (x stack) (map (lambda (x) (my-eval x stack)) x)))
     
     ;; Conditional
     (list 'if my-if)
@@ -154,17 +154,6 @@
 
 ;; VARIABLE BINDINGS #############################################
 
-;; Stack for local variable hash tables
-(define stack '())
-
-;; Add a list of variables x to a stack and return the new stack
-(define (add-vars x stack)
-  (cond
-   [(null? x)
-      stack]
-   [else
-      (add-vars (cdr x) stack)]))
-
 ;; Looks for variable in the stack
 (define (lookup v stack)
   ;(println v)
@@ -185,14 +174,8 @@
 ;; x -> the variable that caused the problem
 (define (ref-error loc x)
   (raise-syntax-error x
-          (string-append "undefined--;\n cannot reference "
+          (string-append "undefined***;\n cannot reference "
                         "an identifer before its definition")))
-
-;; Raises an error for UN_INIT variables
-;; x -> the variable that caused the problem
-(define (un-init-error x)
-  (raise-syntax-error x
-          "undefined;\n cannot use before initialization"))
 
 
 ;SIMPLE EXPRESSIONS #############################################
