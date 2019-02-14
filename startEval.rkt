@@ -84,6 +84,8 @@
           (ref-error 'my-eval-procedure (car x))]
        [(procedure? __val)  ;; variable is a proceduer
           (__val (cdr x) stack)]
+       [(pair? __val)
+          ((my-eval __val stack) (cdr x) stack)]
        [else  ;; first element of function is not a procedure
           (raise-argument-error 'my-eval
                                 "a procedure"
@@ -97,34 +99,34 @@
 (define (builtin)
   (list
     ;; Arithmetic
-    (cons '+ (binary-op +))
-    (cons '- (binary-op -))
-    (cons '* (binary-op *))
-    (cons '/ (binary-op /))
+    (list '+ (binary-op +))
+    (list '- (binary-op -))
+    (list '* (binary-op *))
+    (list '/ (binary-op /))
     
     ;; Comparisson
-    (cons '= (binary-op =))
-    (cons '<= (binary-op <=))
-    (cons '< (binary-op <))
-    (cons '>= (binary-op >=))
-    (cons '> (binary-op >))
-    (cons 'equal? (binary-op equal?))
+    (list '= (binary-op =))
+    (list '<= (binary-op <=))
+    (list '< (binary-op <))
+    (list '>= (binary-op >=))
+    (list '> (binary-op >))
+    (list 'equal? (binary-op equal?))
     
     ;; List
-    (cons 'pair? (unary-op pair?))
-    (cons 'cdr (unary-op cdr))
-    (cons 'car (unary-op car))
-    (cons 'cons (binary-op cons))
+    (list 'pair? (unary-op pair?))
+    (list 'cdr (unary-op cdr))
+    (list 'car (unary-op car))
+    (list 'cons (binary-op cons))
     
     ;; Conditional
-    (cons 'if my-if)
+    (list 'if my-if)
     
     ;; Other
-    (cons 'quote (lambda (x stack)
+    (list 'quote (lambda (x stack)
                     (quasiquote (unquote (car x)))))
-    (cons 'lambda my-lambda)
-    (cons 'let my-let)
-    (cons 'letrec my-letrec)
+    (list 'lambda my-lambda)
+    (list 'let my-let)
+    (list 'letrec my-letrec)
     ))
 
 ;; Redefine a given unary procedure to be a procedure that takes
@@ -165,12 +167,15 @@
 
 ;; Looks for variable in the stack
 (define (lookup v stack)
+  ;(println v)
+  ;(println stack)
   (letrec ([f (lambda (x)
                 (cond
                 [(null? x)
                   UNBOUND]
                 [(equal? (car (car x)) v)
-                  (cdr (car x))]
+                  ;(println (car x))
+                  (cadr (car x))]
                 [else
                   (f (cdr x))]))])
       (f stack)))
@@ -214,18 +219,32 @@
   ;; Create and return the new procedure
   (lambda (args _s)
     (let* ([__param (car x)]
-           [__body (cdr x)])
-        (my-eval (car __body) (assign __param args stack)))))
+           [__body (cdr x)]
+           [__args (eval-args args _s)])
+        ;(println args)
+        ;(println __args)
+        ;(println (assign __param __args stack #f))
+        (my-eval (car __body) (assign __param __args stack #f)))))
 
+;; Evaluate all the args with a given stack
+(define (eval-args args stack)
+  (map (lambda (x)
+          (my-eval x stack))
+       args))
 
-(define (assign vars vals stack)
+;; assign vals to vars and put them onto the stack
+;; returns the new stack. All evaluating done during the assign
+;; uses the stack before things are added to it.
+(define (assign vars vals stack ev)
   (letrec ([rec (lambda (g y st)
                   (if (or (null? g) (null? y))
                     st
                     (rec (cdr g)
                          (cdr y)
-                         (cons (cons (car g)
-                                     (my-eval (car y) stack))
+                         (cons (list (car g)
+                                     (if ev
+                                        (my-eval (car y) stack)
+                                        (car y)))
                                st))))])
     (rec vars vals stack)))
   
@@ -239,42 +258,24 @@
 (define (my-let x stack)
   (let ([__defs (car x)]
         [__body (cdr x)])
-    ;; Initalize all variable value pairs and push onto the stack
-    #t))
+    (my-eval (car __body)
+             (assign (map car __defs)
+                     (map second __defs)
+                     stack
+                     #t))))
 
 ;; Evaluates letrec expressions
 ;; x -> a list of the arguments to a letrec expression
 ;; Returns the result of the last expression in the letrec body
 (define (my-letrec x stack)
-  (let ([__defs (car x)]
-        [__body (cdr x)])
-    ;; Initialize all variables to the table as UN_INIT
-    #t))
-
-
-;; HELPERS ######################################################
-
-;; Map a given procedure onto every element in a list and return
-;; the result of the last application
-;; proc -> a procedure to apply
-;; x    -> a list
-;; Returns the result of the last application of the procedure
-(define (map-last proc x)
-  (letrec ([f (lambda (y res)
-                (if (null? y)
-                  res
-                  (f (cdr y) (proc (car y)))))])
-    (f x (void))))
-
-;; Check if an element is a member of a list
-;; e -> element to search for
-;; x -> a list
-;; Returns #t if e is a member of x, #f if not
-(define (member? e x)
-  (cond
-  [(null? x)
-    #f]
-  [(equal? e (car x))
-    #t]
-  [else
-    (member? e (cdr x))]))
+  (let* ([__defs (car x)]
+        [__body (cdr x)]
+        [__stack (assign (map car __defs)
+                              (map second __defs)
+                              stack
+                              #f)])
+    (my-eval (car __body)
+             (assign (map car __defs)
+                     (map second __defs)
+                     __stack
+                     #t))))

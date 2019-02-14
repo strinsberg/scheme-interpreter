@@ -99,16 +99,16 @@
         10 20)
        "-- Test lambda with following arguments --")
 
-;(test '((lambda (f x y)
- ;         (f x y))
-  ;      (lambda (x y) (+ x y)) 10 20)
-   ;   "-- Test passing a lambda as an argument to a lambda --")
+(test '((lambda (f x y)
+          (f x y))
+        (lambda (x y) (+ x y)) 10 20)
+      "-- Test passing a lambda as an argument to a lambda --")
 
 (test '((lambda (x) ((lambda (y) (+ x y)) x)) 10)
       "-- Test lambda with a lambda in it's body --")
 
-;(test '(((lambda (x) (lambda (y) (+ x y))) 1) 2)
- ;   "-- Function that makes a function --")
+(test '(((lambda (x) (lambda (y) (+ x y))) 1) 2)
+    "-- Function that makes a function --")
 
 ;; Test let/letrec #############################################
 
@@ -128,15 +128,15 @@
        "-- Test letrec simple --")
 
 (test '(letrec ([fact
-                  (lambda (x)
-                    (if (= x 0)
-                      (quote 1)
-                      (* x (fact (- x 1)))))])
-                    (fact 10))
+                (lambda (x)
+                  (if (= x 0)
+                    (quote 1)
+                    (* x (fact (- x 1)))))])
+                  (fact 10))
        "-- Test letrec with a recursive lambda (Factorial) --")
 
 (test '(let ([+ (lambda (x) (car x))]
-             [let (quote (2 3 4 5))])
+             [let (quote (7 5 6))])
           (+ let))
         "-- Test let rebinding keywords with lambda--")
 
@@ -144,13 +144,15 @@
           let)
         "-- Test let rebinding keywords with data --")
 
-;(test '((let ([x 4])
- ;             (lambda (y) (+ x y)))
-  ;        5)
-   ;     "-- test let expresion that returns a procedure as anonymus lambda --")
+(test '((let ([x 4])
+              (lambda (y) (+ x y)))
+          5)
+        "-- test let expresion that returns a procedure as anonymus lambda --")
 
 
 ;; Print test results ###########################################
+(newline)
 (if (= failed 0)
   (display "!!!All Tests Passed!!!\n")
   (display (format "Tests Failed: ~a\n" failed)))
+(newline)
