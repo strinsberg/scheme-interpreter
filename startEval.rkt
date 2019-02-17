@@ -6,6 +6,8 @@
 ;; the code more consise and not to seperate parts of an algorithm
 ;; with large blocks of comments.
 
+;; TODO decide wether to put UNBOUND checking back in or just
+;; remove the whole thing
 
 ;CONSTANTS ######################################################
 
