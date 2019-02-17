@@ -169,7 +169,7 @@
 
 ;; if
 ;; x  ->
-;; ns ->
+;; ns -> a namespace
 (define (my-if x ns)
   (let ([__cond (car x)]
         [__then (second x)]
@@ -180,7 +180,7 @@
 
 ;; list
 ;; x  ->
-;; ns ->
+;; ns -> a namespace
 (define (my-list x ns)
   (map (lambda (x)
           (my-eval x ns))
@@ -188,7 +188,7 @@
 
 ;; quote
 ;; x  ->
-;; ns ->
+;; ns -> a namespace
 (define (my-quote x ns)
   (quasiquote (unquote (car x))))
 
@@ -198,7 +198,7 @@
 
 ;; lambda
 ;; x  ->
-;; ns ->
+;; ns -> a namespace
 (define (my-lambda x ns)
   (lambda (args _s)
     (let ([__param (car x)]
@@ -241,7 +241,7 @@
 
 ;; let
 ;; x  ->
-;; ns ->
+;; ns -> a namespace
 (define (my-let x ns)
   (let ([__defs (car x)]
         [__body (cdr x)])
@@ -253,7 +253,7 @@
 
 ;; letrec
 ;; x  ->
-;; ns ->
+;; ns -> a namespace
 (define (my-letrec x ns)
   (let* ([__defs (car x)]
          [__ns (assign (map car __defs)
