@@ -38,10 +38,11 @@
 ;; return -> the result of the evaluation
 (define (my-eval x ns)
   (cond
-   ;; x is a single data value
+   ;; x is a single peice of data
    [(not (pair? x))
      (if (symbol? x)
        (let ([ __val (lookup x ns)])
+          ;; Error if it has no value
           (if (equal? __val UNBOUND)
             (ref-error x)
             __val))
@@ -61,8 +62,10 @@
      ;; get the value for the variable
      (let ([__val (lookup (car x) ns)])
        (cond
+        ;; Error if it has no value
         [(equal? __val UNBOUND)
           (ref-error (car x))]
+          
         ;; value is a procedure
         [(procedure? __val)
            (__val (cdr x) ns)]
