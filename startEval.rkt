@@ -1,11 +1,8 @@
 #lang racket
-(provide startEval)  ;; Make startEval available when required
-
-;; NOTE all non-trivial functions and algorithms are
-;; more fully documented in the report. This is done to keep
-;; the code more consise and not to seperate parts of an algorithm
-;; with large blocks of comments.
-
+(provide startEval)
+(provide repl-eval)
+(provide lookup)
+(provide UNBOUND)
 
 ;CONSTANTS ######################################################
 
@@ -27,6 +24,15 @@
 (define (startEval x)
   (my-eval x (builtin)))
 
+;; Evaluates a racket program with a given namepsace added to
+;; the builtin namespace. The new namespace is added so that
+;; its binding come before any built-in bindings in lookups.
+;; x -> a racket program
+;; ns -> a namespace
+;; return -> the result of the program
+(define (repl-eval x ns)
+  (my-eval x (append ns (builtin))))
+
 ;; Evaluates a racket expression or program
 ;; x -> a racket expression or program
 ;; return -> the result of the evaluation
@@ -35,7 +41,10 @@
    ;; x is a single data value
    [(not (pair? x))
      (if (symbol? x)
-       (lookup x ns)
+       (let ([ __val (lookup x ns)])
+          (if (equal? __val UNBOUND)
+            (ref-error x)
+            __val))
        x)]
    
    ;; x is a function
@@ -52,6 +61,8 @@
      ;; get the value for the variable
      (let ([__val (lookup (car x) ns)])
        (cond
+        [(equal? __val UNBOUND)
+          (ref-error (car x))]
         ;; value is a procedure
         [(procedure? __val)
            (__val (cdr x) ns)]
