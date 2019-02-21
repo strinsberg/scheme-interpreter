@@ -162,6 +162,35 @@
    [else
       (lookup v (cdr ns))]))
 
+;; NOTE **this could probably be simpler if you construct a
+;; namespace on the way back out and append it to the other one
+;; instead of duplicating it all the way down**
+
+;; Binds vals to vars and construct a new namespace with the
+;; var val pairs and the given namespace.
+;; vars -> a list of variable names
+;; vals -> a list of values
+;; ns -> the current namespace
+;; eval? -> to evaluate values or not before binding
+;; returns -> the new namespace
+(define (assign vars vals ns eval?)
+  (letrec ([rec (lambda (x y new-ns)
+                  ;; If either is null return the new namespace
+                  (if (or (null? x) (null? y))
+                    new-ns
+                    ;; Otherwise list car x and car y and cons
+                    ;; them onto the namespace and recurse on
+                    ;; the rest using the new namespace
+                    (rec (cdr x)
+                         (cdr y)
+                         (cons (list (car x)
+                                     ;; Eval or not before binding
+                                     (if eval?
+                                        (my-eval (car y) ns)
+                                        (car y)))
+                               new-ns))))])
+    (rec vars vals ns)))
+
 ;; Error for referencing unbound variables
 ;; x -> the variable name
 (define (ref-error x)
@@ -233,35 +262,6 @@
           (my-eval x ns))
        args))
 
-;; Binds vals to vars and construct a new namespace with the
-;; var val pairs and the given namespace.
-;; vars -> a list of variable names
-;; vals -> a list of values
-;; ns -> the current namespace
-;; eval? -> wether or not to evaluate the values before
-;; binding them to the variables
-;; returns -> the new namespace
-(define (assign vars vals ns eval?)
-  (letrec ([rec (lambda (x y new-ns)
-                  ;; If either is null return the new namespace
-                  (if (or (null? x) (null? y))
-                    new-ns
-                    ;; Otherwise make a 2 element list to bind the
-                    ;; first variable in x to the first value in y
-                    ;; and cons then onto the new namespace to
-                    ;; use in the recursive call on teh rest of
-                    ;; x and y
-                    (rec (cdr x)
-                         (cdr y)
-                         (cons (list (car x)
-                                     ;; If desired evaluate the
-                                     ;; value before binding it
-                                     (if eval?
-                                        (my-eval (car y) ns)
-                                        (car y)))
-                               new-ns))))])
-    (rec vars vals ns)))
-  
 
 ;LET/LETREC #####################################################
 ;; See report for additional documentation
