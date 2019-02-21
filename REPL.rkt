@@ -1,11 +1,8 @@
 #lang racket
 (require "startEval.rkt")
+;; USES repl-eval
 
-;; The global namespace for the REPL
-(define namespace (make-hash))
-
-;; Some constants and renaming
-(define UN_INIT 'uninit)
+;; Renameing
 (define second cadr)
 
 
@@ -13,20 +10,24 @@
 
 ;; Run the REPL. Reads input from the user and prints the
 ;; evaluated result
-(define (repl)
-  (let ([__input (get-input)])      ;; Prompt and read input
-    (if (or (equal? __input 'exit)  ;; Break if exit is entered
-            (eof-object? __input))
-        #f
-        (begin
-          (cond
-           ;; If input is an repl procedure execute it
-           [(repl-proc? __input)
-              (execute (car __input) (cdr __input))]
-           ;; Otherwise evaluate and print result
-           [else
-              (println (repl-eval __input namespace))])
-          (repl)))))
+(define (repl ns)
+  (let ([__input (get-input)])
+    (cond
+     ;; EOF quits REPL
+     [(eof-object? __input)
+        #f]
+     
+     ;; REPL only functions
+     [(and (pair? __input) (equal? (car __input) 'define))
+        (repl (my-define (cdr __input) ns))]
+     [(and (pair? __input) (equal? (car __input) 'expect))
+        (println (expect-eval (second __input) ns))
+        (repl ns)]
+     
+     ;; Evaluate and print result
+     [else
+        (println (repl-eval __input ns))
+        (repl ns)])))
 
 ;; Get input from the usee. Displays a prompt and reads all text
 ;; when return is pressed.
@@ -37,81 +38,57 @@
 
 ;; Evaluate an expression with the racket interpreter
 (define expect-eval
-  (let [(ns (make-base-namespace))]
-    (lambda (expr) (eval expr ns))))
-
-
-;; REPL PROCEDURES #############################################
-
-;; Checks input to see if it is an repl specific procedure
-(define (repl-proc? input)
-  (and (pair? input)
-       (hash-has-key? global-procs (car input))))
-
-;; Runs an named repl procedure on a list of its arguments
-(define (execute name args)
-      ((hash-ref global-procs name) args))
-
-;; Runs the racket interpreter on an expression/program
-;; If for some reason more than one program is given this
-;; will only run the first one.
-(define (expect args)
-  (println (expect-eval (car args))))
-
-;; Return a hash table of the names and procedures for all global
-;; repl procedures
-(define (make-global-procs)
-    (hash
-        'define my-define
-        'expect expect))
+  (let [(__ns (make-base-namespace))]
+    (lambda (expr ns)
+        (eval (cons 'let
+                    (list ns
+                          expr))
+              __ns))))
 
 
 ;; DEFINE ######################################################
 
-;; Puts the name and value of a def expression into the global ns
-;; x -> the arguments to a def expression
-(define (my-define x)
-  (hash-set! namespace (car x) UN_INIT)
+;; Binds a definition to a name and adds them to a namespace
+;; x -> a variable or function definition
+;; return -> the new namespace
+(define (my-define x ns)
   (if (pair? (car x))
-    (def-func x)
-    (hash-set! namespace
-               (car x)
-               (repl-eval (second x) namespace))))
+    (def-func x ns)
+    (cons (list (car x)
+                (repl-eval (second x) ns))
+          ns)))
 
-;; Specifically deals with defining a def expression that is
-;; a procedure definition.
-;; x -> the arguments to a def expression
-(define (def-func x)
+;; Binds a new function to a name and adds them to a namespace
+;; x -> a function definition
+;; return -> the new namespace
+(define (def-func x ns)
   (let* ([__decl (car x)]
          [__name (car __decl)]
          [__args (cdr __decl)]
          [__body (cdr x)])
-    (hash-set! namespace
-               __name
-               ;; Construct a lambda expression from the input
-               ;; and pass it to the interpreter to get the
-               ;; correct type of procedure
-               (repl-eval (cons 'lambda
-                                (cons __args __body))
-                         namespace))))
+    (cons (list __name
+                ;; Construct a lambda expression from the input
+                ;; and pass it to the interpreter to get the
+                ;; correct type of procedure
+                (repl-eval (cons 'lambda
+                                  (cons __args __body))
+                           ns))
+          ns)))
 
 
 ;; START REPL ###################################################
 
 ;; Runs the REPL with exception handling so that it doesn't
 ;; crash when you make a mistake.
-(define (run)
+(define (run ns)
   (with-handlers ([exn?
                       (lambda (exn)
                         (printf "~a\n" (exn-message exn))
-                        (run))])
-    (repl)))
-
-;; Set up REPL specific procedures
-(define global-procs (make-global-procs))
+                        (run ns))])
+    (repl ns)))
 
 ;; Display opening message
 (display "-- Welcome To My Racket REPL 1.0 --\n")
 
 ;; Start the REPL
-(run)
+(run '())

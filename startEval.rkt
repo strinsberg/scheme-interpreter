@@ -1,19 +1,13 @@
 #lang racket
-(provide startEval)  ;; Make startEval available when required
-
-;; NOTE all non-trivial functions and algorithms are
-;; more fully documented in the report. This is done to keep
-;; the code more consise and not to seperate parts of an algorithm
-;; with large blocks of comments.
-
-;; TODO decide wether to put UNBOUND checking back in or just
-;; remove the whole thing
+(provide startEval)
+(provide repl-eval)
+(provide lookup)
+(provide UNBOUND)
 
 ;CONSTANTS ######################################################
 
-;; A value for declared but unitialized variables in letrec
-;; gensym makes sure that it is a unique value so it won't clash
-;; with anything in the program or evaluated program.
+;; A constant for unbound variables. gensym gives it a unique
+;; value so it won't clash with any other variables.
 (define UNBOUND (gensym))
 
 ;; Some renaming for readability.
@@ -29,48 +23,47 @@
 (define (startEval x)
   (my-eval x (builtin)))
 
+;; Evaluates a racket program with a given namepsace added to
+;; the builtin namespace. The new namespace is added so that
+;; its binding come before any built-in bindings in lookups.
+;; x -> a racket program
+;; ns -> a namespace
+;; return -> the result of the program
+(define (repl-eval x ns)
+  (my-eval x (append ns (builtin))))
+
 ;; Evaluates a racket expression or program
 ;; x -> a racket expression or program
 ;; return -> the result of the evaluation
 (define (my-eval x ns)
   (cond
-   ;; x is a single data value
+   ;; x is a single peice of data
    [(not (pair? x))
      (if (symbol? x)
-       (lookup x ns)
+       (let ([ __val (lookup x ns)])
+          (if (equal? __val UNBOUND)  ;; Error if it has no value
+            (ref-error x)
+            __val))
        x)]
    
-   ;; x is a function
-   ;; the procedure for x is a function
-   [(pair? (car x))
+   ;; x is a function. Its first arg should eval to a procedure
+   [(pair? (car x))  ;; x's first arg is a function
      ((my-eval (car x) ns) (cdr x) ns)]
-     
-   ;; the procedure for x is a procedure
-   [(procedure? (car x))
+
+   [(procedure? (car x))  ;; first arg is a procedure
      ((car x) (cdr x) ns)]
    
-   ;; the procedure for x is a variable
-   [else
-     ;; get the value for the variable
+   [(symbol? (car x))  ;; first arg is a variable
      (let ([__val (lookup (car x) ns)])
-       (cond
-        ;; value is a procedure
-        [(procedure? __val)
-           (__val (cdr x) ns)]
-           
-        ;; value is a function
-        [(pair? __val)
-           ((my-eval __val ns) (cdr x) ns)]
-           
-        ;; value is another variable
-        [(symbol? __val)
-           ((my-eval (lookup __val ns) ns) (cdr x) ns)]
-           
-        ;; value is not a procedure
-        [else
-           (raise-argument-error 'my-eval
-                                 "a procedure***"
-                                  __val)]))]))
+        (if (equal? __val UNBOUND)
+          (ref-error (car x))
+          ;; substitute and eval again
+          (my-eval (cons __val (cdr x)) ns)))]
+   
+   [else  ;; first arg is not a procedure
+     (raise-argument-error 'my-eval
+                           "a procedure***"
+                           (car x))]))
 
 
 ;; BUILTINS #####################################################
@@ -111,10 +104,8 @@
     (list 'letrec my-letrec)
     ))
 
-;; Redefine a given unary procedure to be a procedure that takes
-;; a list of arguments and a namespace. When called the new
-;; procedure calls proc on the evaluated value of the first
-;; argument. Aditional arguments are discarded.
+;; Redefine a given unary procedure to take a list of arguments
+;; and a namespace. New procedure calls proc on the first arg.
 ;; proc -> a racket procedure
 ;; return -> the new procedure.
 (define (unary-op proc)
@@ -140,7 +131,7 @@
 ;; Looks up a given variables in a given namespace
 ;; v -> a variable name
 ;; ns -> a namespace
-;; returns -> the bound value or UNBOUND
+;; return -> the bound value or UNBOUND
 (define (lookup v ns)
   (cond
    [(null? ns)
@@ -149,6 +140,29 @@
       (second (car ns))]
    [else
       (lookup v (cdr ns))]))
+
+;; Bind 2 lists of variables and values into a list of var, val
+;; tuples. If list are not the same length extras are discarded.
+;; x -> a list of variable names
+;; y -> a list of values
+;; return -> a list of var, value tuples
+(define (bind x y)
+  (if (or (null? x) (null? y))
+    '()
+    (cons (list (car x)
+                (car y))
+          (bind (cdr x) (cdr y)))))
+
+;; Evaluates and rebinds the values in a list of variable, value
+;; tuples.
+;; x -> a list of var, val tuples
+;; ns -> a namespace
+;; return -> a list with variable and evaluated value tuples
+(define (eval-values x ns)
+  (map (lambda (y)
+          (list (car y)
+                (my-eval (second y) ns)))
+       x))
 
 ;; Error for referencing unbound variables
 ;; x -> the variable name
@@ -196,60 +210,18 @@
 ;; x  -> a list of arguments
 ;; ns -> a namespace
 (define (my-lambda x ns)
-  ;; Create a procedure to be called when the lambda procedure
-  ;; would be evaluated.
+  ;; Create a procedure for the lambda
   (lambda (args __ns)
     (let ([__param (car x)]
-          ;; Evaluate the arguments to the lambda call with
-          ;; the current namespace.
-          [__args (eval-args args __ns)])
-      ;; Evaluate the body with a namespace that has the original
-      ;; lambdas parameters assigned to the arguments passed to
-      ;; the call of this procedure. Use the namespace that was
-      ;; current when this procedure was created. Do not evaluate
-      ;; the arguments as they were already evaluated with their
-      ;; proper namespace.
+          ;; Evaluate the arguments with the current namespace
+          [__args (map (lambda (x)
+                          (my-eval x __ns))
+                       args)])
+      ;; Evaluate the body with the namespace that was current
+      ;; when the lambda was created
       (my-eval (second x)
-               (assign __param __args ns #f)))))
+               (append (bind __param __args) ns)))))
 
-;; Evaluate a list of arguments.
-;; args -> a list of arguments to a lambda
-;; ns -> the current namespace
-;; returns -> a list of the results
-(define (eval-args args ns)
-  (map (lambda (x)
-          (my-eval x ns))
-       args))
-
-;; Binds vals to vars and construct a new namespace with the
-;; var val pairs and the given namespace.
-;; vars -> a list of variable names
-;; vals -> a list of values
-;; ns -> the current namespace
-;; eval? -> wether or not to evaluate the values before
-;; binding them to the variables
-;; returns -> the new namespace
-(define (assign vars vals ns eval?)
-  (letrec ([rec (lambda (x y new-ns)
-                  ;; If either is null return the new namespace
-                  (if (or (null? x) (null? y))
-                    new-ns
-                    ;; Otherwise make a 2 element list to bind the
-                    ;; first variable in x to the first value in y
-                    ;; and cons then onto the new namespace to
-                    ;; use in the recursive call on teh rest of
-                    ;; x and y
-                    (rec (cdr x)
-                         (cdr y)
-                         (cons (list (car x)
-                                     ;; If desired evaluate the
-                                     ;; value before binding it
-                                     (if eval?
-                                        (my-eval (car y) ns)
-                                        (car y)))
-                               new-ns))))])
-    (rec vars vals ns)))
-  
 
 ;LET/LETREC #####################################################
 ;; See report for additional documentation
@@ -259,15 +231,10 @@
 ;; ns -> a namespace
 ;; return -> the result
 (define (my-let x ns)
-  (let ([__defs (car x)]
-        [__body (cdr x)])
-    ;; Evaluate the body and pass it a namespace that has the
-    ;; local variables and their evaluated values.
+  (let ([__defs (car x)])
+    ;; Evaluate body after adding local bindings to the namespace
     (my-eval (second x)
-             (assign (map car __defs)
-                     (map second __defs)
-                     ns
-                     #t))))
+             (append (eval-values __defs ns) ns))))
 
 ;; Evaluates the arguments to a letrec function.
 ;; x -> a list of arguments
@@ -275,17 +242,9 @@
 ;; return -> the result
 (define (my-letrec x ns)
   (let* ([__defs (car x)]
-         ;; Create a new namespace with the definition variables
-         ;; and their unevaluated values.
-         [__ns (assign (map car __defs)
-                       (map second __defs)
-                       ns
-                       #f)])
-    ;; Return the result of evaluating the lambda body, but this
-    ;; time use the namespace with unevaluated values and
-    ;; re-assign the values but this time evaluate them.
+         ;; Add unevaluated binding to create a new namespace
+         [__ns (append __defs ns)])
+    ;; Evaluate body after adding evaluated local bindings to the
+    ;; namespace
     (my-eval (second x)
-             (assign (map car __defs)
-                     (map second __defs)
-                     __ns
-                     #t))))
+             (append (eval-values __defs __ns) ns))))
