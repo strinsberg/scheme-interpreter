@@ -6,9 +6,8 @@
 
 ;CONSTANTS ######################################################
 
-;; A value for declared but unitialized variables in letrec
-;; gensym makes sure that it is a unique value so it won't clash
-;; with anything in the program or evaluated program.
+;; A constant for unbound variables. gensym gives it a unique
+;; value so it won't clash with any other variables.
 (define UNBOUND (gensym))
 
 ;; Some renaming for readability.
@@ -57,6 +56,9 @@
    [else  ;; x's first arg is a variable
      (let ([__val (lookup (car x) ns)])  ;; get value
        (cond
+        [(equal? __val UNBOUND)  ;; variable has no value
+          (ref-error (car x))]
+          
         [(procedure? __val)  ;; variable represents a procedure
            (__val (cdr x) ns)]
            
@@ -65,9 +67,6 @@
            
         [(symbol? __val)  ;; variable points to another varaible
            ((my-eval (lookup __val ns) ns) (cdr x) ns)]
-        
-        [(equal? __val UNBOUND)  ;; variable has no value
-          (ref-error (car x))]
           
         [else  ;; variable is not a procedure
            (raise-argument-error 'my-eval
