@@ -1,8 +1,5 @@
 #lang racket
 (provide startEval)
-(provide repl-eval)
-(provide lookup)
-(provide UNBOUND)
 
 ;CONSTANTS ######################################################
 
@@ -22,15 +19,6 @@
 ;; return -> the result of the program
 (define (startEval x)
   (my-eval x (builtin)))
-
-;; Evaluates a racket program with a given namepsace added to
-;; the builtin namespace. The new namespace is added so that
-;; its binding come before any built-in bindings in lookups.
-;; x -> a racket program
-;; ns -> a namespace
-;; return -> the result of the program
-(define (repl-eval x ns)
-  (my-eval x (append ns (builtin))))
 
 ;; Evaluates a racket expression or program
 ;; x -> a racket expression or program
@@ -85,14 +73,12 @@
     (list '>= (binary-op >=))
     (list '> (binary-op >))
     (list 'equal? (binary-op equal?))
-    (list 'null? (unary-op null?))
     
     ;; List
     (list 'pair? (unary-op pair?))
     (list 'cdr (unary-op cdr))
     (list 'car (unary-op car))
     (list 'cons (binary-op cons))
-    (list 'list my-list)
     
     ;; Conditional
     (list 'if my-if)
@@ -185,15 +171,6 @@
     (if (my-eval __cond ns)
       (my-eval __then ns)
       (my-eval __else ns))))
-
-;; Evaluates the arguments to a list function
-;; x -> a list of arguments
-;; ns -> a namespace
-;; return -> the result
-(define (my-list x ns)
-  (map (lambda (x)
-          (my-eval x ns))
-        x))
 
 ;; Evaluates the arguments to a quote function
 ;; x -> a list of arguments
