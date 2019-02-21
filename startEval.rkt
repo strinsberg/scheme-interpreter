@@ -50,28 +50,20 @@
    [(pair? (car x))  ;; x's first arg is a function
      ((my-eval (car x) ns) (cdr x) ns)]
 
-   [(procedure? (car x))  ;; x' first arg is a procedure
+   [(procedure? (car x))  ;; first arg is a procedure
      ((car x) (cdr x) ns)]
    
-   [else  ;; x's first arg is a variable
-     (let ([__val (lookup (car x) ns)])  ;; get value
-       (cond
-        [(equal? __val UNBOUND)  ;; variable has no value
-          (ref-error (car x))]
-          
-        [(procedure? __val)  ;; variable represents a procedure
-           (__val (cdr x) ns)]
-           
-        [(pair? __val)  ;; variable represents a function
-           ((my-eval __val ns) (cdr x) ns)]
-           
-        [(symbol? __val)  ;; variable points to another varaible
-           ((my-eval (lookup __val ns) ns) (cdr x) ns)]
-          
-        [else  ;; variable is not a procedure
-           (raise-argument-error 'my-eval
-                                 "a procedure***"
-                                  __val)]))]))
+   [(symbol? (car x))  ;; first arg is a variable
+     (let ([__val (lookup (car x) ns)])
+        (if (equal? __val UNBOUND)
+          (ref-error (car x))
+          ;; substitute and eval again
+          (my-eval (cons __val (cdr x)) ns)))]
+   
+   [else  ;; first arg is not a procedure
+     (raise-argument-error 'my-eval
+                           "a procedure***"
+                           (car x))]))
 
 
 ;; BUILTINS #####################################################

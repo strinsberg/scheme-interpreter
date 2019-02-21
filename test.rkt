@@ -1,8 +1,9 @@
 #lang racket
 (require "startEval.rkt")
 
-;; Number of failed tests
+;; Test numbers
 (define failed 0)
+(define passed 0)
 
 ;; Returns the expected value of a program or expression
 (define expect-eval
@@ -19,12 +20,14 @@
     (cond
     [(not (equal? __expected __actual))
       (set! failed (+ failed 1))
-      (display (format "~a\n" title))
+      (newline)
       (display "!!!Failed!!!\n")
+      (display (format "~a\n" title))
       (display (format "Expected: ~a\n" __expected))
       (display (format "Actual: ~a\n" __actual))
       (display "\n")]
     [else
+      (set! passed (+ passed 1))
       (println title)])))
 
 
@@ -424,7 +427,10 @@
 
 ;; Print test results ###########################################
 (newline)
-(if (= failed 0)
-  (display "!!!All Tests Passed!!!\n")
-  (display (format "Tests Failed: ~a\n" failed)))
+(cond
+ [(= failed 0)
+  (display (format "!!!All Tests Passed (~a)!!!\n" passed))]
+ [else
+  (display (format "Tests Passed: ~a\n" passed))
+  (display (format "Tests Failed: ~a\n" failed))])
 (newline)
