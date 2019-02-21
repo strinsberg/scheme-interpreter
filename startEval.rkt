@@ -152,7 +152,7 @@
 ;; Looks up a given variables in a given namespace
 ;; v -> a variable name
 ;; ns -> a namespace
-;; returns -> the bound value or UNBOUND
+;; return -> the bound value or UNBOUND
 (define (lookup v ns)
   (cond
    [(null? ns)
@@ -162,34 +162,34 @@
    [else
       (lookup v (cdr ns))]))
 
-;; NOTE **this could probably be simpler if you construct a
-;; namespace on the way back out and append it to the other one
-;; instead of duplicating it all the way down**
-
-;; Binds vals to vars and construct a new namespace with the
-;; var val pairs and the given namespace.
-;; vars -> a list of variable names
-;; vals -> a list of values
+;; Adds variable, value tuples to a namespace. If desired will
+;; evaluate the values first.
+;; x -> a list of var, val tupples
 ;; ns -> the current namespace
-;; eval? -> to evaluate values or not before binding
-;; returns -> the new namespace
-(define (assign vars vals ns eval?)
-  (letrec ([rec (lambda (x y new-ns)
-                  ;; If either is null return the new namespace
-                  (if (or (null? x) (null? y))
-                    new-ns
-                    ;; Otherwise list car x and car y and cons
-                    ;; them onto the namespace and recurse on
-                    ;; the rest using the new namespace
-                    (rec (cdr x)
-                         (cdr y)
-                         (cons (list (car x)
-                                     ;; Eval or not before binding
-                                     (if eval?
-                                        (my-eval (car y) ns)
-                                        (car y)))
-                               new-ns))))])
-    (rec vars vals ns)))
+;; eval? -> to evaluate values before adding tupple
+;; return -> a new namespace
+(define (add-bindings x ns eval?)
+  (letrec ([rec (lambda (x)
+                  (if (null? x)
+                    ns
+                    (cons (if eval?
+                            (list (car (car x))
+                                  (my-eval (second (car x)) ns))
+                            (car x))
+                          (rec (cdr x)))))])
+    (rec x)))
+
+;; Bind 2 lists of variables and values into a list of var, val
+;; tuples. If list are not the same length extras are discarded.
+;; x -> a list of variable names
+;; y -> a list of values
+;; return -> a list of var, value tuples
+(define (bind x y)
+  (if (or (null? x) (null? y))
+    '()
+    (cons (list (car x)
+                (car y))
+          (bind (cdr x) (cdr y)))))
 
 ;; Error for referencing unbound variables
 ;; x -> the variable name
@@ -243,7 +243,8 @@
     (let ([__param (car x)]
           ;; Evaluate the arguments to the lambda call with
           ;; the current namespace.
-          [__args (eval-args args __ns)])
+          [__args (map (lambda (x) (my-eval x __ns))
+                       args)])
       ;; Evaluate the body with a namespace that has the original
       ;; lambdas parameters assigned to the arguments passed to
       ;; the call of this procedure. Use the namespace that was
@@ -251,16 +252,7 @@
       ;; the arguments as they were already evaluated with their
       ;; proper namespace.
       (my-eval (second x)
-               (assign __param __args ns #f)))))
-
-;; Evaluate a list of arguments.
-;; args -> a list of arguments to a lambda
-;; ns -> the current namespace
-;; returns -> a list of the results
-(define (eval-args args ns)
-  (map (lambda (x)
-          (my-eval x ns))
-       args))
+               (add-bindings (bind __param __args) ns #f)))))
 
 
 ;LET/LETREC #####################################################
@@ -271,15 +263,10 @@
 ;; ns -> a namespace
 ;; return -> the result
 (define (my-let x ns)
-  (let ([__defs (car x)]
-        [__body (cdr x)])
+  (let ([__defs (car x)])
     ;; Evaluate the body and pass it a namespace that has the
     ;; local variables and their evaluated values.
-    (my-eval (second x)
-             (assign (map car __defs)
-                     (map second __defs)
-                     ns
-                     #t))))
+    (my-eval (second x) (add-bindings __defs ns #t))))
 
 ;; Evaluates the arguments to a letrec function.
 ;; x -> a list of arguments
@@ -289,15 +276,8 @@
   (let* ([__defs (car x)]
          ;; Create a new namespace with the definition variables
          ;; and their unevaluated values.
-         [__ns (assign (map car __defs)
-                       (map second __defs)
-                       ns
-                       #f)])
+         [__ns (add-bindings __defs ns #f)])
     ;; Return the result of evaluating the lambda body, but this
     ;; time use the namespace with unevaluated values and
     ;; re-assign the values but this time evaluate them.
-    (my-eval (second x)
-             (assign (map car __defs)
-                     (map second __defs)
-                     __ns
-                     #t))))
+    (my-eval (second x) (add-bindings __defs __ns #t))))
