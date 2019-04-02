@@ -156,6 +156,13 @@
           5)
         "-- test let expresion that returns a procedure as anonymus lambda --")
 
+(test '(let ([fib (lambda (n) (+ n 1))])
+        (letrec ((fib
+            (lambda (n) (if (<= n 1) 1 (+ (fib (- n 1)) (fib (- n 2)))))))
+           
+           (fib 7)))
+      "-- Letrec variable already defined: fib --")
+
 ;; More Complex tests ##########################################
 
 (test '((lambda (x y)
@@ -212,6 +219,7 @@
                           (15 () ())
                           (16 () ())))))
         "-- Finding the height of a tree --")
+
 
 
 ;; Other instructor tests #######################################
