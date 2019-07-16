@@ -1,13 +1,14 @@
 #lang racket
 (provide  make-env
           env-lookup
-          env-push-ns
           env-add-binding
+          env-add-bindings
           env-empty?
           make-binding
           binding-symbol
           binding-value
           binding-eq?
+          binding-zip
           unbound?)
 
 
@@ -31,27 +32,26 @@
 ;; symbol env -> any | unbound-symbol 
 (define (env-lookup symbol env)
   (if (env-empty? env)
-      UNBOUND
-      (let ([value (ns-lookup symbol (env-top-ns env))])
-        (if (unbound? value)
-          (env-lookup symbol (env-rest env))
-          value))))
-
-;; Push an empty namespace onto the environment
-;; env -> env
-(define (env-push-ns env)
-  (cons (make-namespace) env))
+    UNBOUND
+    (if (binding-eq? symbol (env-car env))
+      (binding-value (env-car env))
+      (env-lookup symbol (env-rest env)))))
 
 ;; Add a binding onto the top namespace of an env
 ;; binding env -> env
 (define (env-add-binding binding env)
-  (if (env-empty? env)
-      (env-add-binding binding (env-push-ns env))
-      (cons (ns-add-binding binding (env-top-ns env)) (env-rest env))))
+  (cons binding env))
 
-;; Get the top namespace in an environment
-;; env -> namespace
-(define (env-top-ns env) (car env))
+;; Add a list of bindings to the given environment
+;; list of binding env -> env
+(define (env-add-bindings bindings env)
+  (if (null? bindings)
+    env
+    (env-add-bindings (cdr bindings)
+                      (cons (car bindings) env))))
+
+;; env -> binding
+(define (env-car env) (car env))
 
 ;; Get the rest of the environment
 ;; env -> env
@@ -61,35 +61,6 @@
 ;; env -> bool
 (define (env-empty? env)
   (null? env))
-
-
-;; Namespace ##########################################################
-
-;; Returns a new namespace
-;; -> namespace
-(define (make-namespace) (list))
-
-;; Returns the value of a symbol in a namespace or UNBOUND
-;; symbol namespace -> any | unbound-symbol
-(define (ns-lookup symbol namespace)
-  (if (null? namespace)
-      UNBOUND
-      (if (binding-eq? symbol (ns-top namespace))
-        (binding-value (ns-top namespace))
-        (ns-lookup symbol (ns-rest namespace)))))
-
-;; Returns the top binding of the namespace
-;; namespace -> binding
-(define (ns-top namespace) (car namespace))
-
-;; Returns the rest of the namespace
-;; namespace -> namespace
-(define (ns-rest namespace) (cdr namespace))
-
-;; Adds a new binding to a namespace
-;; namespace -> namespace
-(define (ns-add-binding binding namespace)
-  (cons binding namespace))
 
 
 ;; Binding ############################################################
@@ -106,6 +77,15 @@
 ;; binding -> any
 (define (binding-value binding) (cadr binding))
 
+;; Checks to see if a binding is for the given symbol
+;; symbol binding -> bool
 (define (binding-eq? symbol binding)
   (equal? symbol (binding-symbol binding)))
+
+;; Takes a list of symbols and a list of values and returns a list
+;; of bindings with each symbol associated with the value at the same
+;; position in the other list.
+;; list list -> list of binding
+(define (binding-zip symbols vals)
+  (map make-binding symbols vals))
 
