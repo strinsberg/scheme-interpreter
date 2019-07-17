@@ -27,8 +27,7 @@
       (display (format "Actual: ~a\n" __actual))
       (display "\n")]
     [else
-      (set! passed (+ passed 1))
-      (println title)])))
+      (set! passed (+ passed 1))])))
 
 
 ;; Simple tests #################################################

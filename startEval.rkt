@@ -1,11 +1,6 @@
 #lang racket
-(provide startEval)
-
-;CONSTANTS ######################################################
-
-;; A constant for unbound variables. gensym gives it a unique
-;; value so it won't clash with any other variables.
-(define UNBOUND (gensym))
+(require "enviro.rkt")
+(provide startEval repl-eval)
 
 ;; Some renaming for readability.
 (define second cadr)
@@ -18,76 +13,83 @@
 ;; x -> a racket program
 ;; return -> the result of the program
 (define (startEval x)
-  (my-eval x (builtin)))
+  (my-eval x (environment)))
 
 ;; Evaluates a racket expression or program
 ;; x -> a racket expression or program
 ;; return -> the result of the evaluation
-(define (my-eval x ns)
-  (cond
-   ;; x is a single peice of data
-   [(not (pair? x))
-     (if (symbol? x)
-       (let ([ __val (lookup x ns)])
-          (if (equal? __val UNBOUND)  ;; Error if it has no value
-            (ref-error x)
-            __val))
-       x)]
-   
-   ;; x is a function. Its first arg should eval to a procedure
-   [(pair? (car x))  ;; x's first arg is a function
-     ((my-eval (car x) ns) (cdr x) ns)]
-
-   [(procedure? (car x))  ;; first arg is a procedure
-     ((car x) (cdr x) ns)]
-   
-   [(symbol? (car x))  ;; first arg is a variable
-     (let ([__val (lookup (car x) ns)])
-        (if (equal? __val UNBOUND)
-          (ref-error (car x))
-          ;; substitute and eval again
-          (my-eval (cons __val (cdr x)) ns)))]
-   
-   [else  ;; first arg is not a procedure
-     (raise-argument-error 'my-eval
-                           "a procedure***"
-                           (car x))]))
+(define (my-eval x env)
+  (if (not (pair? x))
+     (eval-atom x env)
+     (eval-function x env)))
 
 
-;; BUILTINS #####################################################
+(define (eval-atom x env)
+  (if (symbol? x)
+    (let ([ __val (env-lookup x env)])
+      (if (unbound? __val)
+        (ref-error x)
+        __val))
+  x))
 
-;; Returns a hash table with all builtin function names and their
+(define (eval-function x env)
+  (let ([__proc (car x)]
+        [__args (cdr x)])
+    (cond
+     [(pair? __proc)
+       ((my-eval __proc env) __args env)]
+     [(procedure? __proc)
+       (__proc __args env)]
+     [(symbol? __proc)
+       (let ([__val (env-lookup __proc env)])
+         (if (unbound? __val)
+           (ref-error x)
+           (my-eval (cons __val __args) env)))]
+     [else
+       (raise-argument-error 'my-eval
+                             "a procedure***"
+                             (car x))])))
+
+(define (repl-eval x env)
+  (my-eval x (env-add-bindings env (environment))))
+
+;; BUILT env #####################################################
+
+(define (environment)
+  (env-add-bindings (builtin) (make-env)))
+
+;; Retu env a list with all builtin function names and their
 ;; associated procedures.
 (define (builtin)
   (list
     ;; Arithmetic
-    (list '+ (binary-op +))
-    (list '- (binary-op -))
-    (list '* (binary-op *))
-    (list '/ (binary-op /))
+    (make-binding '+ (binary-op +))
+    (make-binding '- (binary-op -))
+    (make-binding '* (binary-op *))
+    (make-binding '/ (binary-op /))
     
     ;; Comparisson
-    (list '= (binary-op =))
-    (list '<= (binary-op <=))
-    (list '< (binary-op <))
-    (list '>= (binary-op >=))
-    (list '> (binary-op >))
-    (list 'equal? (binary-op equal?))
+    (make-binding '= (binary-op =))
+    (make-binding '<= (binary-op <=))
+    (make-binding '< (binary-op <))
+    (make-binding '>= (binary-op >=))
+    (make-binding '> (binary-op >))
+    (make-binding 'equal? (binary-op equal?))
     
     ;; List
-    (list 'pair? (unary-op pair?))
-    (list 'cdr (unary-op cdr))
-    (list 'car (unary-op car))
-    (list 'cons (binary-op cons))
+    (make-binding 'pair? (unary-op pair?))
+    (make-binding 'cdr (unary-op cdr))
+    (make-binding 'car (unary-op car))
+    (make-binding 'cons (binary-op cons))
     
     ;; Conditional
-    (list 'if my-if)
+    (make-binding 'if my-if)
     
     ;; Other
-    (list 'quote my-quote)
-    (list 'lambda my-lambda)
-    (list 'let my-let)
-    (list 'letrec my-letrec)
+    (make-binding 'quote my-quote)
+    (make-binding 'lambda my-lambda)
+    (make-binding 'let my-let)
+    (make-binding 'letrec my-letrec)
     ))
 
 ;; Redefine a given unary procedure to take a list of arguments
@@ -95,60 +97,34 @@
 ;; proc -> a racket procedure
 ;; return -> the new procedure.
 (define (unary-op proc)
-  (lambda (x ns)
-    (proc (my-eval (car x) ns))))
+  (lambda (x env)
+    (proc (my-eval (car x) env))))
 
 ;; Same as unary-op but for binary procedures
 (define (binary-op proc)
-  (lambda (x ns)
-    (proc (my-eval (car x) ns)
-          (my-eval (second x) ns))))
+  (lambda (x env)
+    (proc (my-eval (car x) env)
+          (my-eval (second x) env))))
 
 ;; Same as unary-op but for ternary procedures
 (define (ternary-op proc)
-  (lambda (x ns)
-    (proc (my-eval (car x) ns)
-          (my-eval (second x) ns)
-          (my-eval (third x) ns))))
+  (lambda (x env)
+    (proc (my-eval (car x) env)
+          (my-eval (second x) env)
+          (my-eval (third x) env))))
 
 
 ;; VARIABLE BINDINGS ############################################
 
-;; Looks up a given variables in a given namespace
-;; v -> a variable name
-;; ns -> a namespace
-;; return -> the bound value or UNBOUND
-(define (lookup v ns)
-  (cond
-   [(null? ns)
-      UNBOUND]
-   [(equal? (caar ns) v)
-      (second (car ns))]
-   [else
-      (lookup v (cdr ns))]))
-
-;; Bind 2 lists of variables and values into a list of var, val
-;; tuples. If list are not the same length extras are discarded.
-;; x -> a list of variable names
-;; y -> a list of values
-;; return -> a list of var, value tuples
-(define (bind x y)
-  (if (or (null? x) (null? y))
-    '()
-    (cons (list (car x)
-                (car y))
-          (bind (cdr x) (cdr y)))))
-
-;; Evaluates and rebinds the values in a list of variable, value
-;; tuples.
+;; Retu env a new list of bindings with all values evaluated
 ;; x -> a list of var, val tuples
-;; ns -> a namespace
+;; env -> a namespace
 ;; return -> a list with variable and evaluated value tuples
-(define (eval-values x ns)
-  (map (lambda (y)
-          (list (car y)
-                (my-eval (second y) ns)))
-       x))
+(define (eval-bindings bindings env)
+  (map (lambda (b)
+          (make-binding (binding-symbol b)
+                        (my-eval (binding-value b) env)))
+       bindings))
 
 ;; Error for referencing unbound variables
 ;; x -> the variable name
@@ -158,25 +134,25 @@
                         "an identifer before its definition")))
 
 
-;SIMPLE EXPRESSIONS #############################################
+;SIMPLE EXPRESSI env #############################################
 
 ;; Exaluates the arguments to an if function
 ;; x -> a list of arguments
-;; ns -> a namespace
+;; env -> a namespace
 ;; return -> the result
-(define (my-if x ns)
+(define (my-if x env)
   (let ([__cond (car x)]
         [__then (second x)]
         [__else (third x)])
-    (if (my-eval __cond ns)
-      (my-eval __then ns)
-      (my-eval __else ns))))
+    (if (my-eval __cond env)
+      (my-eval __then env)
+      (my-eval __else env))))
 
 ;; Evaluates the arguments to a quote function
 ;; x -> a list of arguments
-;; ns -> a namespace
+;; env -> a namespace
 ;; return -> the result
-(define (my-quote x ns)
+(define (my-quote x env)
   (quasiquote (unquote (car x))))
 
 
@@ -185,19 +161,19 @@
 
 ;; Evaluates the arguments to a lambda function
 ;; x  -> a list of arguments
-;; ns -> a namespace
-(define (my-lambda x ns)
+;; env -> a namespace
+(define (my-lambda x env)
   ;; Create a procedure for the lambda
-  (lambda (args __ns)
+  (lambda (args __env)
     (let ([__param (car x)]
           ;; Evaluate the arguments with the current namespace
           [__args (map (lambda (x)
-                          (my-eval x __ns))
+                          (my-eval x __env))
                        args)])
       ;; Evaluate the body with the namespace that was current
       ;; when the lambda was created
       (my-eval (second x)
-               (append (bind __param __args) ns)))))
+               (env-add-bindings (binding-zip __param __args) env)))))
 
 
 ;LET/LETREC #####################################################
@@ -205,23 +181,23 @@
 
 ;; Evaluates the arguments to a let function
 ;; x -> a list of arguments
-;; ns -> a namespace
+;; env -> a namespace
 ;; return -> the result
-(define (my-let x ns)
+(define (my-let x env)
   (let ([__defs (car x)])
     ;; Evaluate body after adding local bindings to the namespace
     (my-eval (second x)
-             (append (eval-values __defs ns) ns))))
+             (env-add-bindings (eval-bindings __defs env) env))))
 
 ;; Evaluates the arguments to a letrec function.
 ;; x -> a list of arguments
-;; ns -> a namespace
+;; env -> a namespace
 ;; return -> the result
-(define (my-letrec x ns)
+(define (my-letrec x env)
   (let* ([__defs (car x)]
          ;; Add unevaluated binding to create a new namespace
-         [__ns (append __defs ns)])
+         [__env (env-add-bindings __defs env)])
     ;; Evaluate body after adding evaluated local bindings to the
     ;; namespace
     (my-eval (second x)
-             (append (eval-values __defs __ns) ns))))
+             (env-add-bindings (eval-bindings __defs __env) env))))
