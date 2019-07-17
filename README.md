@@ -11,6 +11,8 @@ It was a really nice way to get an understanding of interpreters and functional 
 
 As an extra I added a simple REPL that can run the implemented subset of the language. It also allows global definitions.
 
+The enviro.rkt module was added after the project was finished. I wanted to experiment with some simple things I read in a lisp book and try out rackets unit testing. So I made a separate module for the environment and added some unit tests. Since the environment and bindings are just lists it is all a bit unnecessary, but by using these functions one could change their implementation without requiring changes in the interpreter.
+
 Try It
 ======
 
