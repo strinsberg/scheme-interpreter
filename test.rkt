@@ -27,7 +27,8 @@
       (display (format "Actual: ~a\n" __actual))
       (display "\n")]
     [else
-      (set! passed (+ passed 1))])))
+      (set! passed (+ passed 1))
+      (println title)])))
 
 
 ;; Simple tests #################################################
@@ -76,8 +77,8 @@
       "-- Test with number and list --")
 
 ;Test list
-;;(test '(list 4 5 6 7)
-;;      "-- Test list --")
+(test '(list 4 5 6 7)
+      "-- Test list --")
 
 ;Test car
 (test '(car '(4 5 6 7))
@@ -273,6 +274,31 @@
            (intersect (quote (a b c d)) (quote (b c d e f))))
       "-- Instructor Tests: Intersect --")
 
+;; Extras testing ###############################################
+
+;; The returns from list are the same, but if my eval processes
+;; the list that is returned it will think the first c is a
+;; variable and not a symbol
+;; See tests below in fails section
+(test '(let ([c 6])
+          (list (list "3" 4 'c)
+                (list 4 "5" c)))
+      "-- list with symbols and variables --")
+
+;; test cond
+(test '(letrec ([member? (lambda (e x)
+                            (cond
+                            [(null? x)
+                              #f]
+                            [(equal? e (car x))
+                              #t]
+                            [#t
+                              (member? e (cdr x))]))])
+              (member? 4 (list 3 6 5 2 4 6)))
+      "-- Test cond with letrec and lambda --")
+
+(test '(list (map (lambda (x) (* x x)) (list 1 4 9 16)))
+      "-- Test map with simple lambda")
 
 ;; Print test results ###########################################
 (newline)

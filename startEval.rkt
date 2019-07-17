@@ -48,7 +48,7 @@
      [else
        (raise-argument-error 'my-eval
                              "a procedure***"
-                             (car x))])))
+                             (list __proc __args))])))
 
 (define (repl-eval x env)
   (my-eval x (env-add-bindings env (environment))))
@@ -75,21 +75,26 @@
     (make-binding '>= (binary-op >=))
     (make-binding '> (binary-op >))
     (make-binding 'equal? (binary-op equal?))
+    (make-binding 'null? (unary-op null?))
+    (make-binding 'not (unary-op not))
     
     ;; List
     (make-binding 'pair? (unary-op pair?))
     (make-binding 'cdr (unary-op cdr))
     (make-binding 'car (unary-op car))
     (make-binding 'cons (binary-op cons))
+    (make-binding 'list my-list)
     
     ;; Conditional
     (make-binding 'if my-if)
+    (make-binding 'cond my-cond)
     
     ;; Other
     (make-binding 'quote my-quote)
     (make-binding 'lambda my-lambda)
     (make-binding 'let my-let)
     (make-binding 'letrec my-letrec)
+    (make-binding 'map my-map)
     ))
 
 ;; Redefine a given unary procedure to take a list of arguments
@@ -155,6 +160,8 @@
 (define (my-quote x env)
   (quasiquote (unquote (car x))))
 
+(define (my-list x env)
+  (map (lambda (y) (my-eval y env)) x))
 
 ;; LAMBDA #######################################################
 ;; See report for additional documentation
@@ -201,3 +208,31 @@
     ;; namespace
     (my-eval (second x)
              (env-add-bindings (eval-bindings __defs __env) env))))
+
+;; My version of cond function
+(define (my-cond x env)
+  (cond
+  [(not (null? x))
+    (let* ([__stmt (car x)]
+           [__cond (car __stmt)]
+           [__body (second __stmt)])
+    (if (my-eval __cond env)
+      (my-eval __body env)
+      (my-cond (cdr x) env)))]))
+
+;; Evaluates the arguments of a map expression
+;; x -> a list of arguments to map
+;; Returns a list of the results of calling a procedure on each
+;; element in a list
+(define (my-map x env)
+  (let ([__proc (car x)]
+        [__list (second x)])
+    (map-rec (my-eval __proc env) (my-eval __list env) env)))
+
+(define (map-rec proc x env)
+  (cond
+   [(null? x)
+      '()]
+   [else
+    (cons (proc (list (car x)) env)
+          (map-rec proc (cdr x) env))]))
