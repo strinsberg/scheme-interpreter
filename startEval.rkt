@@ -1,4 +1,5 @@
 #lang racket
+
 (require "enviro.rkt")
 (provide startEval repl-eval)
 
@@ -9,14 +10,15 @@
 
 ;; EVAL #########################################################
 
-;; Evaluates a racket program
-;; x -> a racket program
+;; Evaluates a lisp program
+;; x -> a lisp program
 ;; return -> the result of the program
 (define (startEval x)
   (my-eval x (environment)))
 
-;; Evaluates a racket expression or program
-;; x -> a racket expression or program
+;; Evaluates a lisp expression or program
+;; x -> a lisp expression or program
+;; env -> the current evaluation environment
 ;; return -> the result of the evaluation
 (define (my-eval x env)
   (if (not (pair? x))
@@ -24,6 +26,10 @@
      (eval-function x env)))
 
 
+;; Evaluates an expression that is made up of a single non-list element
+;; x -> a lisp atom
+;; env -> the current evaluation environment
+;; return -> the result of the evaluation
 (define (eval-atom x env)
   (if (symbol? x)
     (let ([ __val (env-lookup x env)])
@@ -32,6 +38,11 @@
         __val))
   x))
 
+
+;; Evaluates a lisp expression that is a function expression
+;; x -> a lisp function expression
+;; env -> the current evaluation environment
+;; return -> the result of the evaluation
 (define (eval-function x env)
   (let ([__proc (car x)]
         [__args (cdr x)])
@@ -50,16 +61,21 @@
                              "a procedure***"
                              (list __proc __args))])))
 
+;; A special function used to start the REPL
 (define (repl-eval x env)
   (my-eval x (env-add-bindings env (environment))))
 
-;; BUILT env #####################################################
 
+;; BUILTIN ENV #################################################
+
+;; Creates a new enviromnet with all the builtin bindings
 (define (environment)
   (env-add-bindings (builtin) (make-env)))
 
-;; Retu env a list with all builtin function names and their
+;; Returns a list with all builtin function names and their
 ;; associated procedures.
+;; Any additional structures can be added to an associated symbol
+;; in this list and they will become part of the language
 (define (builtin)
   (list
     ;; Arithmetic
@@ -99,7 +115,7 @@
 
 ;; Redefine a given unary procedure to take a list of arguments
 ;; and a namespace. New procedure calls proc on the first arg.
-;; proc -> a racket procedure
+;; proc -> a lisp procedure
 ;; return -> the new procedure.
 (define (unary-op proc)
   (lambda (x env)
@@ -121,10 +137,10 @@
 
 ;; VARIABLE BINDINGS ############################################
 
-;; Retu env a new list of bindings with all values evaluated
+;; Returns a new list of bindings with all values evaluated
 ;; x -> a list of var, val tuples
-;; env -> a namespace
-;; return -> a list with variable and evaluated value tuples
+;; env -> the current evaluation environment
+;; return -> a list of bindings
 (define (eval-bindings bindings env)
   (map (lambda (b)
           (make-binding (binding-symbol b)
@@ -139,12 +155,12 @@
                         "an identifer before its definition")))
 
 
-;SIMPLE EXPRESSI env #############################################
+;; SIMPLE EXPRESSIONS ##########################################
 
 ;; Exaluates the arguments to an if function
 ;; x -> a list of arguments
-;; env -> a namespace
-;; return -> the result
+;; env -> the current evaluation environment
+;; return -> the result of the if expression
 (define (my-if x env)
   (let ([__cond (car x)]
         [__then (second x)]
@@ -155,20 +171,25 @@
 
 ;; Evaluates the arguments to a quote function
 ;; x -> a list of arguments
-;; env -> a namespace
-;; return -> the result
+;; env -> the current evaluation environment
+;; return -> the quoted result
 (define (my-quote x env)
   (quasiquote (unquote (car x))))
 
+;; Evaluates the arguments to a list function
+;; x -> a list of arguments
+;; env -> the current evaluation environment
+;; return -> the new list
 (define (my-list x env)
   (map (lambda (y) (my-eval y env)) x))
 
+
 ;; LAMBDA #######################################################
-;; See report for additional documentation
 
 ;; Evaluates the arguments to a lambda function
 ;; x  -> a list of arguments
-;; env -> a namespace
+;; env -> the current evaluation environment
+;; returns -> a procedure that will execute the lambda when called
 (define (my-lambda x env)
   ;; Create a procedure for the lambda
   (lambda (args __env)
@@ -184,12 +205,11 @@
 
 
 ;LET/LETREC #####################################################
-;; See report for additional documentation
 
 ;; Evaluates the arguments to a let function
 ;; x -> a list of arguments
 ;; env -> a namespace
-;; return -> the result
+;; return -> the result of the let expression
 (define (my-let x env)
   (let ([__defs (car x)])
     ;; Evaluate body after adding local bindings to the namespace
@@ -199,7 +219,7 @@
 ;; Evaluates the arguments to a letrec function.
 ;; x -> a list of arguments
 ;; env -> a namespace
-;; return -> the result
+;; return -> the result of the letrec expression
 (define (my-letrec x env)
   (let* ([__defs (car x)]
          ;; Add unevaluated binding to create a new namespace
@@ -209,7 +229,10 @@
     (my-eval (second x)
              (env-add-bindings (eval-bindings __defs __env) env))))
 
-;; My version of cond function
+;; Evaluates a conditional expression
+;; x -> a list of arguments
+;; env -> the current evaluation environment
+;; return -> the result of the conditional expression
 (define (my-cond x env)
   (cond
   [(not (null? x))
@@ -221,14 +244,15 @@
       (my-cond (cdr x) env)))]))
 
 ;; Evaluates the arguments of a map expression
-;; x -> a list of arguments to map
-;; Returns a list of the results of calling a procedure on each
-;; element in a list
+;; x -> a list of arguments
+;; env -> the current evaluation environment
+;; return -> the result of the map expression
 (define (my-map x env)
   (let ([__proc (car x)]
         [__list (second x)])
     (map-rec (my-eval __proc env) (my-eval __list env) env)))
 
+;; Recursive helper for my-map
 (define (map-rec proc x env)
   (cond
    [(null? x)

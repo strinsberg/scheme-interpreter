@@ -10,10 +10,13 @@
   (let [(ns (make-base-namespace))]
     (lambda (expr) (eval expr ns))))
 
-;Testing function
-;x -> a racket expression '(+ 3 4)
-;expect -> the expected result
-;title -> the title of the test
+;; Testing function that executes the given expression with a base
+;; racket environment to see what the result should be. It then executes
+;; the expression with startEval and compares the result.
+;; If the test passes the test name is printed and if it fails the title
+;; and the expected and actual values are printed.
+;; x -> a quoted racket expression. eg) '(+ 3 4)
+;; title -> the title of the test
 (define (test x title)
   (let ([__expected (expect-eval x)]
         [__actual (startEval x)])
@@ -33,18 +36,18 @@
 
 ;; Simple tests #################################################
 
-;Test with single data values
+;; Test with single data values
 (test '4 "-- Test with a number --")
 (test '"hello" "-- Test with a string --")
 (test '#t "-- Test with an empty list --")
 
-;Test arithmetic operators
+;; Test arithmetic operators
 (test  '(+ (- 20 5)
            (* (/ 10 2)
              (+ 3 1)))
         "-- Test arithmetic operators --")
 
-;Test relational operators
+;; Test relational operators
 (test '(= 5 5) "-- Test = --")
 (test '(< 5 3) "-- Test < --")
 (test '(<= 3 5) "-- Test <= --")
@@ -54,7 +57,7 @@
 (test '(equal? (quote ()) (quote ()))
       "-- Test equal? with lists --")
 
-;Test if expressions
+;; Test if expressions
 (test '(if (< 3 5)
           3
           5)
@@ -65,30 +68,30 @@
           5)
       "-- Test if-else --")
 
-;Test quote
+;; Test quote
 (test '(quote (+ 3 4))
       "-- Test quote --")
 
-;Test cons
+;; Test cons
 (test '(cons 4 5)
       "-- Test cons on two numbers --")
       
 (test '(cons 4 '(5 6 7))
       "-- Test with number and list --")
 
-;Test list
+;; Test list
 (test '(list 4 5 6 7)
       "-- Test list --")
 
-;Test car
+;; Test car
 (test '(car '(4 5 6 7))
       "-- Test car --")
 
-;Test cdr
+;; Test cdr
 (test '(cdr '(4 5 6 7))
       "-- Test cdr --")
 
-;Test pair?
+;; Test pair?
 (test '(pair? '(4 5 6 7))
       "-- Test pair? on list --")
 
@@ -97,7 +100,6 @@
 
 ;; Test lambda ##################################################
 
-;Test lambda
 (test '((lambda (x) x) 10)
        "-- Test lambda with just return x --")
 
@@ -297,10 +299,16 @@
               (member? 4 (list 3 6 5 2 4 6)))
       "-- Test cond with letrec and lambda --")
 
+;; test map
 (test '(list (map (lambda (x) (* x x)) (list 1 4 9 16)))
       "-- Test map with simple lambda")
 
 ;; Print test results ###########################################
+
+;; If an error crashes the program it occured in the test after the last
+;; title that is printed. Titles are printed after a test is run not
+;; before.
+
 (newline)
 (cond
  [(= failed 0)

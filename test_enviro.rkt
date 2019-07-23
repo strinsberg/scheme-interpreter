@@ -4,6 +4,10 @@
          rackunit/text-ui
          "enviro.rkt")
 
+;; Tests for the environment module
+;; My first try at doing unit testing with racket
+;; Hopefully the tests names are sufficient to document the tests.
+;; The implementation of the environment and bindings is not complex.
 (define env-tests
   (test-suite
     "test envrionment module"
