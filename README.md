@@ -1,7 +1,7 @@
-Simple Lisp Interpreter in Racket
-=================================
+Simple Scheme Interpreter in Racket
+===================================
 
-For a project in a programming class I wrote a simple lisp interpreter using racket.
+For a project in a programming class I wrote a simple scheme interpreter using racket.
 
 We were allowed to define simple procedures in terms of their racket equivalents, but had to write the more complicated procedures ourselves.
 
